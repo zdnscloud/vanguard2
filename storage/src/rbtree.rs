@@ -5,269 +5,8 @@ use std::iter::{FromIterator, IntoIterator};
 use std::marker;
 use std::mem;
 use std::ops::Index;
-use std::ptr;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum Color {
-    Red,
-    Black,
-}
-
-struct RBTreeNode<K: Ord, V> {
-    color: Color,
-    left: NodePtr<K, V>,
-    right: NodePtr<K, V>,
-    parent: NodePtr<K, V>,
-    key: K,
-    value: V,
-}
-
-impl<K: Ord, V> RBTreeNode<K, V> {
-    fn pair(self) -> (K, V) {
-        (self.key, self.value)
-    }
-}
-
-impl<K, V> Debug for RBTreeNode<K, V>
-where
-    K: Ord + Debug,
-    V: Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "k:{:?} v:{:?} c:{:?}", self.key, self.value, self.color)
-    }
-}
-
-#[derive(Debug)]
-struct NodePtr<K: Ord, V>(*mut RBTreeNode<K, V>);
-
-impl<K: Ord, V> Clone for NodePtr<K, V> {
-    fn clone(&self) -> NodePtr<K, V> {
-        NodePtr(self.0)
-    }
-}
-
-impl<K: Ord, V> Copy for NodePtr<K, V> {}
-
-impl<K: Ord, V> Ord for NodePtr<K, V> {
-    fn cmp(&self, other: &NodePtr<K, V>) -> Ordering {
-        unsafe { (*self.0).key.cmp(&(*other.0).key) }
-    }
-}
-
-impl<K: Ord, V> PartialOrd for NodePtr<K, V> {
-    fn partial_cmp(&self, other: &NodePtr<K, V>) -> Option<Ordering> {
-        unsafe { Some((*self.0).key.cmp(&(*other.0).key)) }
-    }
-}
-
-impl<K: Ord, V> PartialEq for NodePtr<K, V> {
-    fn eq(&self, other: &NodePtr<K, V>) -> bool {
-        self.0 == other.0
-    }
-}
-
-impl<K: Ord, V> Eq for NodePtr<K, V> {}
-
-impl<K: Ord, V> NodePtr<K, V> {
-    fn new(k: K, v: V) -> NodePtr<K, V> {
-        let node = RBTreeNode {
-            color: Color::Black,
-            left: NodePtr::null(),
-            right: NodePtr::null(),
-            parent: NodePtr::null(),
-            key: k,
-            value: v,
-        };
-        NodePtr(Box::into_raw(Box::new(node)))
-    }
-
-    #[inline]
-    fn set_color(&mut self, color: Color) {
-        if self.is_null() {
-            return;
-        }
-        unsafe {
-            (*self.0).color = color;
-        }
-    }
-
-    #[inline]
-    fn set_red_color(&mut self) {
-        self.set_color(Color::Red);
-    }
-
-    #[inline]
-    fn set_black_color(&mut self) {
-        self.set_color(Color::Black);
-    }
-
-    #[inline]
-    fn get_color(&self) -> Color {
-        if self.is_null() {
-            return Color::Black;
-        }
-        unsafe { (*self.0).color }
-    }
-
-    #[inline]
-    fn unwrap_key(&self) -> &K {
-        unsafe { &(*self.0).key }
-    }
-
-    #[inline]
-    fn is_red_color(&self) -> bool {
-        if self.is_null() {
-            return false;
-        }
-        unsafe { (*self.0).color == Color::Red }
-    }
-
-    #[inline]
-    fn is_black_color(&self) -> bool {
-        if self.is_null() {
-            return true;
-        }
-        unsafe { (*self.0).color == Color::Black }
-    }
-
-    #[inline]
-    fn is_left_child(&self) -> bool {
-        self.parent().left() == *self
-    }
-
-    #[inline]
-    fn is_right_child(&self) -> bool {
-        self.parent().right() == *self
-    }
-
-    #[inline]
-    fn min_node(self) -> NodePtr<K, V> {
-        let mut temp = self.clone();
-        while !temp.left().is_null() {
-            temp = temp.left();
-        }
-        return temp;
-    }
-
-    #[inline]
-    fn max_node(self) -> NodePtr<K, V> {
-        let mut temp = self.clone();
-        while !temp.right().is_null() {
-            temp = temp.right();
-        }
-        return temp;
-    }
-
-    #[inline]
-    fn next(self) -> NodePtr<K, V> {
-        if !self.right().is_null() {
-            self.right().min_node()
-        } else {
-            let mut temp = self;
-            loop {
-                if temp.parent().is_null() {
-                    return NodePtr::null();
-                }
-                if temp.is_left_child() {
-                    return temp.parent();
-                }
-                temp = temp.parent();
-            }
-        }
-    }
-
-    #[inline]
-    fn prev(self) -> NodePtr<K, V> {
-        if !self.left().is_null() {
-            self.left().max_node()
-        } else {
-            let mut temp = self;
-            loop {
-                if temp.parent().is_null() {
-                    return NodePtr::null();
-                }
-                if temp.is_right_child() {
-                    return temp.parent();
-                }
-                temp = temp.parent();
-            }
-        }
-    }
-
-    #[inline]
-    fn set_parent(&mut self, parent: NodePtr<K, V>) {
-        if self.is_null() {
-            return;
-        }
-        unsafe { (*self.0).parent = parent }
-    }
-
-    #[inline]
-    fn set_left(&mut self, left: NodePtr<K, V>) {
-        if self.is_null() {
-            return;
-        }
-        unsafe { (*self.0).left = left }
-    }
-
-    #[inline]
-    fn set_right(&mut self, right: NodePtr<K, V>) {
-        if self.is_null() {
-            return;
-        }
-        unsafe { (*self.0).right = right }
-    }
-
-    #[inline]
-    fn parent(&self) -> NodePtr<K, V> {
-        if self.is_null() {
-            return NodePtr::null();
-        }
-        unsafe { (*self.0).parent.clone() }
-    }
-
-    #[inline]
-    fn left(&self) -> NodePtr<K, V> {
-        if self.is_null() {
-            return NodePtr::null();
-        }
-        unsafe { (*self.0).left.clone() }
-    }
-
-    #[inline]
-    fn right(&self) -> NodePtr<K, V> {
-        if self.is_null() {
-            return NodePtr::null();
-        }
-        unsafe { (*self.0).right.clone() }
-    }
-
-    #[inline]
-    fn null() -> NodePtr<K, V> {
-        NodePtr(ptr::null_mut())
-    }
-
-    #[inline]
-    fn is_null(&self) -> bool {
-        self.0.is_null()
-    }
-}
-
-impl<K: Ord + Clone, V: Clone> NodePtr<K, V> {
-    unsafe fn deep_clone(&self) -> NodePtr<K, V> {
-        let mut node = NodePtr::new((*self.0).key.clone(), (*self.0).value.clone());
-        if !self.left().is_null() {
-            node.set_left(self.left().deep_clone());
-            node.left().set_parent(node);
-        }
-        if !self.right().is_null() {
-            node.set_right(self.right().deep_clone());
-            node.right().set_parent(node);
-        }
-        node
-    }
-}
+use crate::rbnode::{Color, NodePtr};
 
 pub struct RBTree<K: Ord, V> {
     root: NodePtr<K, V>,
@@ -276,7 +15,6 @@ pub struct RBTree<K: Ord, V> {
 
 // Drop all owned pointers if the tree is dropped
 impl<K: Ord, V> Drop for RBTree<K, V> {
-    #[inline]
     fn drop(&mut self) {
         self.clear();
     }
@@ -369,7 +107,6 @@ where
 {
     type Output = V;
 
-    #[inline]
     fn index(&self, index: &K) -> &V {
         self.get(index).expect("no entry found for key")
     }
@@ -414,12 +151,10 @@ impl<'a, K: Ord + Debug, V> fmt::Debug for Keys<'a, K, V> {
 impl<'a, K: Ord, V> Iterator for Keys<'a, K, V> {
     type Item = &'a K;
 
-    #[inline]
     fn next(&mut self) -> Option<(&'a K)> {
         self.inner.next().map(|(k, _)| k)
     }
 
-    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.inner.size_hint()
     }
@@ -446,12 +181,10 @@ impl<'a, K: Ord + Debug, V: Debug> fmt::Debug for Values<'a, K, V> {
 impl<'a, K: Ord, V> Iterator for Values<'a, K, V> {
     type Item = &'a V;
 
-    #[inline]
     fn next(&mut self) -> Option<(&'a V)> {
         self.inner.next().map(|(_, v)| v)
     }
 
-    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.inner.size_hint()
     }
@@ -478,12 +211,10 @@ impl<'a, K: Ord + Debug, V: Debug> fmt::Debug for ValuesMut<'a, K, V> {
 impl<'a, K: Ord, V> Iterator for ValuesMut<'a, K, V> {
     type Item = &'a mut V;
 
-    #[inline]
     fn next(&mut self) -> Option<(&'a mut V)> {
         self.inner.next().map(|(_, v)| v)
     }
 
-    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.inner.size_hint()
     }
@@ -498,7 +229,6 @@ pub struct IntoIter<K: Ord, V> {
 
 // Drop all owned pointers if the collection is dropped
 impl<K: Ord, V> Drop for IntoIter<K, V> {
-    #[inline]
     fn drop(&mut self) {
         for (_, _) in self {}
     }
@@ -530,7 +260,6 @@ impl<K: Ord, V> Iterator for IntoIter<K, V> {
 }
 
 impl<K: Ord, V> DoubleEndedIterator for IntoIter<K, V> {
-    #[inline]
     fn next_back(&mut self) -> Option<(K, V)> {
         if self.len == 0 {
             return None;
@@ -650,7 +379,6 @@ impl<'a, K: Ord + 'a, V: 'a> Iterator for IterMut<'a, K, V> {
 }
 
 impl<'a, K: Ord + 'a, V: 'a> DoubleEndedIterator for IterMut<'a, K, V> {
-    #[inline]
     fn next_back(&mut self) -> Option<(&'a K, &'a mut V)> {
         if self.len == 0 {
             return None;
@@ -671,7 +399,6 @@ impl<K: Ord, V> IntoIterator for RBTree<K, V> {
     type Item = (K, V);
     type IntoIter = IntoIter<K, V>;
 
-    #[inline]
     fn into_iter(mut self) -> IntoIter<K, V> {
         let iter = if self.root.is_null() {
             IntoIter {
@@ -692,7 +419,6 @@ impl<K: Ord, V> IntoIterator for RBTree<K, V> {
 }
 
 impl<K: Ord, V> RBTree<K, V> {
-    /// Creates an empty `RBTree`.
     pub fn new() -> RBTree<K, V> {
         RBTree {
             root: NodePtr::null(),
@@ -700,14 +426,10 @@ impl<K: Ord, V> RBTree<K, V> {
         }
     }
 
-    /// Returns the len of `RBTree`.
-    #[inline]
     pub fn len(&self) -> usize {
         self.len
     }
 
-    /// Returns `true` if the `RBTree` is empty.
-    #[inline]
     pub fn is_empty(&self) -> bool {
         self.root.is_null()
     }
@@ -812,7 +534,7 @@ impl<K: Ord, V> RBTree<K, V> {
 
         while !x.is_null() {
             y = x;
-            match k.cmp(x.unwrap_key()) {
+            match k.cmp(x.get_key()) {
                 Ordering::Less => {
                     x = x.left();
                 }
@@ -894,7 +616,6 @@ impl<K: Ord, V> RBTree<K, V> {
         }
     }
 
-    #[inline]
     pub fn get_first(&self) -> Option<(&K, &V)> {
         let first = self.first_child();
         if first.is_null() {
@@ -903,7 +624,6 @@ impl<K: Ord, V> RBTree<K, V> {
         unsafe { Some((&(*first.0).key, &(*first.0).value)) }
     }
 
-    #[inline]
     pub fn get_last(&self) -> Option<(&K, &V)> {
         let last = self.last_child();
         if last.is_null() {
@@ -912,7 +632,6 @@ impl<K: Ord, V> RBTree<K, V> {
         unsafe { Some((&(*last.0).key, &(*last.0).value)) }
     }
 
-    #[inline]
     pub fn pop_first(&mut self) -> Option<(K, V)> {
         let first = self.first_child();
         if first.is_null() {
@@ -921,7 +640,6 @@ impl<K: Ord, V> RBTree<K, V> {
         unsafe { Some(self.delete(first)) }
     }
 
-    #[inline]
     pub fn pop_last(&mut self) -> Option<(K, V)> {
         let last = self.last_child();
         if last.is_null() {
@@ -930,7 +648,6 @@ impl<K: Ord, V> RBTree<K, V> {
         unsafe { Some(self.delete(last)) }
     }
 
-    #[inline]
     pub fn get_first_mut(&mut self) -> Option<(&K, &mut V)> {
         let first = self.first_child();
         if first.is_null() {
@@ -939,7 +656,6 @@ impl<K: Ord, V> RBTree<K, V> {
         unsafe { Some((&(*first.0).key, &mut (*first.0).value)) }
     }
 
-    #[inline]
     pub fn get_last_mut(&mut self) -> Option<(&K, &mut V)> {
         let last = self.last_child();
         if last.is_null() {
@@ -948,7 +664,6 @@ impl<K: Ord, V> RBTree<K, V> {
         unsafe { Some((&(*last.0).key, &mut (*last.0).value)) }
     }
 
-    #[inline]
     pub fn get(&self, k: &K) -> Option<&V> {
         let node = self.find_node(k);
         if node.is_null() {
@@ -958,7 +673,6 @@ impl<K: Ord, V> RBTree<K, V> {
         unsafe { Some(&(*node.0).value) }
     }
 
-    #[inline]
     pub fn get_mut(&mut self, k: &K) -> Option<&mut V> {
         let node = self.find_node(k);
         if node.is_null() {
@@ -968,7 +682,6 @@ impl<K: Ord, V> RBTree<K, V> {
         unsafe { Some(&mut (*node.0).value) }
     }
 
-    #[inline]
     pub fn contains_key(&self, k: &K) -> bool {
         let node = self.find_node(k);
         if node.is_null() {
@@ -977,7 +690,6 @@ impl<K: Ord, V> RBTree<K, V> {
         true
     }
 
-    #[inline]
     fn clear_recurse(&mut self, current: NodePtr<K, V>) {
         if !current.is_null() {
             unsafe {
@@ -988,7 +700,6 @@ impl<K: Ord, V> RBTree<K, V> {
         }
     }
 
-    #[inline]
     pub fn clear(&mut self) {
         let root = self.root;
         self.root = NodePtr::null();
@@ -996,12 +707,10 @@ impl<K: Ord, V> RBTree<K, V> {
     }
 
     /// Empties the `RBTree` without freeing objects in it.
-    #[inline]
     fn fast_clear(&mut self) {
         self.root = NodePtr::null();
     }
 
-    #[inline]
     pub fn remove(&mut self, k: &K) -> Option<V> {
         let node = self.find_node(k);
         if node.is_null() {
@@ -1010,7 +719,6 @@ impl<K: Ord, V> RBTree<K, V> {
         unsafe { Some(self.delete(node).1) }
     }
 
-    #[inline]
     unsafe fn delete_fixup(&mut self, mut node: NodePtr<K, V>, mut parent: NodePtr<K, V>) {
         let mut other;
         while node != self.root && node.is_black_color() {
@@ -1149,26 +857,20 @@ impl<K: Ord, V> RBTree<K, V> {
         return obj.pair();
     }
 
-    #[inline]
     pub fn keys(&self) -> Keys<K, V> {
         Keys { inner: self.iter() }
     }
 
-    #[inline]
     pub fn values(&self) -> Values<K, V> {
         Values { inner: self.iter() }
     }
 
-    /// Return the value iter mut
-    #[inline]
     pub fn values_mut(&mut self) -> ValuesMut<K, V> {
         ValuesMut {
             inner: self.iter_mut(),
         }
     }
 
-    /// Return the key and value iter
-    #[inline]
     pub fn iter(&self) -> Iter<K, V> {
         Iter {
             head: self.first_child(),
@@ -1178,8 +880,6 @@ impl<K: Ord, V> RBTree<K, V> {
         }
     }
 
-    /// Return the key and mut value iter
-    #[inline]
     pub fn iter_mut(&mut self) -> IterMut<K, V> {
         IterMut {
             head: self.first_child(),
