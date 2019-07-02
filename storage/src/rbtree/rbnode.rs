@@ -1,6 +1,7 @@
 use std::cmp::Ord;
 use std::cmp::Ordering;
 use std::fmt::{self, Debug};
+use std::mem;
 use std::ptr;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -126,35 +127,35 @@ impl<K: Ord, V> NodePtr<K, V> {
         self.parent().right() == *self
     }
 
-    pub fn min_node(self) -> NodePtr<K, V> {
-        let mut temp = self.clone();
-        while !temp.left().is_null() {
-            temp = temp.left();
+    pub fn min_node(&self) -> NodePtr<K, V> {
+        let mut node = *self;
+        while !node.left().is_null() {
+            node = node.left();
         }
-        return temp;
+        return node;
     }
 
-    pub fn max_node(self) -> NodePtr<K, V> {
-        let mut temp = self.clone();
-        while !temp.right().is_null() {
-            temp = temp.right();
+    pub fn max_node(&self) -> NodePtr<K, V> {
+        let mut node = *self;
+        while !node.right().is_null() {
+            node = node.right();
         }
-        return temp;
+        return node;
     }
 
     pub fn next(self) -> NodePtr<K, V> {
         if !self.right().is_null() {
             self.right().min_node()
         } else {
-            let mut temp = self;
+            let mut node = self;
             loop {
-                if temp.parent().is_null() {
+                if node.parent().is_null() {
                     return NodePtr::null();
                 }
-                if temp.is_left_child() {
-                    return temp.parent();
+                if node.is_left_child() {
+                    return node.parent();
                 }
-                temp = temp.parent();
+                node = node.parent();
             }
         }
     }
@@ -163,15 +164,15 @@ impl<K: Ord, V> NodePtr<K, V> {
         if !self.left().is_null() {
             self.left().max_node()
         } else {
-            let mut temp = self;
+            let mut node = self;
             loop {
-                if temp.parent().is_null() {
+                if node.parent().is_null() {
                     return NodePtr::null();
                 }
-                if temp.is_right_child() {
-                    return temp.parent();
+                if node.is_right_child() {
+                    return node.parent();
                 }
-                temp = temp.parent();
+                node = node.parent();
             }
         }
     }
@@ -192,6 +193,38 @@ impl<K: Ord, V> NodePtr<K, V> {
         unsafe { (*self.0).parent.clone() }
     }
 
+    pub fn grand_parent(&self) -> NodePtr<K, V> {
+        let parent = self.parent();
+        if parent.is_null() {
+            return NodePtr::null();
+        } else {
+            parent.parent()
+        }
+    }
+
+    pub fn sibling(parent: NodePtr<K, V>, child: NodePtr<K, V>) -> NodePtr<K, V> {
+        if parent.is_null() {
+            NodePtr::null()
+        } else if parent.left() == child {
+            parent.right()
+        } else {
+            parent.left()
+        }
+    }
+
+    pub fn uncle(&self) -> NodePtr<K, V> {
+        let grand_parent = self.grand_parent();
+        if grand_parent.is_null() {
+            return NodePtr::null();
+        }
+
+        if self.parent() == grand_parent.left() {
+            grand_parent.right()
+        } else {
+            grand_parent.left()
+        }
+    }
+
     pub fn left(&self) -> NodePtr<K, V> {
         unsafe { (*self.0).left.clone() }
     }
@@ -206,6 +239,10 @@ impl<K: Ord, V> NodePtr<K, V> {
 
     pub fn is_null(&self) -> bool {
         self.0.is_null()
+    }
+
+    pub fn swap_value(&self, other: &NodePtr<K, V>) {
+        unsafe { mem::swap(&mut (*self.0).value, &mut (*other.0).value) }
     }
 }
 

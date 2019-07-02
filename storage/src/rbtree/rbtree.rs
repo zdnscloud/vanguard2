@@ -6,7 +6,7 @@ use std::marker;
 use std::mem;
 use std::ops::Index;
 
-use crate::rbnode::{Color, NodePtr};
+use crate::rbtree::rbnode::{Color, NodePtr};
 
 pub struct RBTree<K: Ord, V> {
     root: NodePtr<K, V>,
@@ -428,94 +428,76 @@ impl<K: Ord, V> RBTree<K, V> {
     }
 
     unsafe fn left_rotate(&mut self, mut node: NodePtr<K, V>) {
-        let mut temp = node.right();
-        node.set_right(temp.left());
-
-        if !temp.left().is_null() {
-            temp.left().set_parent(node.clone());
+        let mut right = node.right();
+        let mut rleft = right.left();
+        node.set_right(rleft);
+        if rleft.is_null() == false {
+            rleft.set_parent(node);
         }
 
-        temp.set_parent(node.parent());
+        right.set_parent(node.parent());
         if node == self.root {
-            self.root = temp.clone();
+            self.root = right;
         } else if node == node.parent().left() {
-            node.parent().set_left(temp.clone());
+            node.parent().set_left(right);
         } else {
-            node.parent().set_right(temp.clone());
+            node.parent().set_right(right);
         }
-
-        temp.set_left(node.clone());
-        node.set_parent(temp.clone());
+        right.set_left(node);
+        node.set_parent(right);
     }
 
     unsafe fn right_rotate(&mut self, mut node: NodePtr<K, V>) {
-        let mut temp = node.left();
-        node.set_left(temp.right());
-
-        if !temp.right().is_null() {
-            temp.right().set_parent(node.clone());
+        let mut left = node.left();
+        let mut lright = left.right();
+        node.set_left(lright);
+        if lright.is_null() == false {
+            lright.set_parent(node);
         }
 
-        temp.set_parent(node.parent());
+        left.set_parent(node.parent());
         if node == self.root {
-            self.root = temp.clone();
+            self.root = left;
         } else if node == node.parent().right() {
-            node.parent().set_right(temp.clone());
+            node.parent().set_right(left);
         } else {
-            node.parent().set_left(temp.clone());
+            node.parent().set_left(left);
         }
-
-        temp.set_right(node.clone());
-        node.set_parent(temp.clone());
+        left.set_right(node);
+        node.set_parent(left);
     }
 
     unsafe fn insert_fixup(&mut self, mut node: NodePtr<K, V>) {
-        let mut parent;
-        let mut gparent;
+        while node != self.root {
+            let mut parent = node.parent();
+            if parent.is_black_color() {
+                break;
+            }
 
-        while node.parent().is_red_color() {
-            parent = node.parent();
-            gparent = parent.parent();
-            if parent == gparent.left() {
-                let mut uncle = gparent.right();
-                if !uncle.is_null() && uncle.is_red_color() {
-                    uncle.set_black_color();
-                    parent.set_black_color();
-                    gparent.set_red_color();
-                    node = gparent;
-                    continue;
-                }
-
-                if parent.right() == node {
-                    self.left_rotate(parent);
-                    let temp = parent;
-                    parent = node;
-                    node = temp;
-                }
-
+            let mut uncle = node.uncle();
+            let mut grand_parent = node.grand_parent();
+            if uncle.is_null() == false && uncle.is_red_color() {
                 parent.set_black_color();
-                gparent.set_red_color();
-                self.right_rotate(gparent);
+                uncle.set_black_color();
+                grand_parent.set_red_color();
+                node = grand_parent;
             } else {
-                let mut uncle = gparent.left();
-                if !uncle.is_null() && uncle.is_red_color() {
-                    uncle.set_black_color();
-                    parent.set_black_color();
-                    gparent.set_red_color();
-                    node = gparent;
-                    continue;
-                }
-
-                if parent.left() == node {
+                if node == parent.right() && parent == grand_parent.left() {
+                    node = parent;
+                    self.left_rotate(parent);
+                } else if node == parent.left() && parent == grand_parent.right() {
+                    node = parent;
                     self.right_rotate(parent);
-                    let temp = parent;
-                    parent = node;
-                    node = temp;
                 }
-
+                parent = node.parent();
                 parent.set_black_color();
-                gparent.set_red_color();
-                self.left_rotate(gparent);
+                grand_parent.set_red_color();
+                if node == parent.left() {
+                    self.right_rotate(grand_parent);
+                } else {
+                    self.left_rotate(grand_parent);
+                }
+                break;
             }
         }
         self.root.set_black_color();
@@ -731,69 +713,60 @@ impl<K: Ord, V> RBTree<K, V> {
     }
 
     unsafe fn delete_fixup(&mut self, mut node: NodePtr<K, V>, mut parent: NodePtr<K, V>) {
-        let mut other;
         while node != self.root && node.is_black_color() {
-            if parent.left() == node {
-                other = parent.right();
-                if other.is_red_color() {
-                    other.set_black_color();
-                    parent.set_red_color();
+            let mut sibling = NodePtr::sibling(parent, node);
+            let is_right_sibling = parent.left() == node;
+            if sibling.is_red_color() {
+                sibling.set_black_color();
+                parent.set_red_color();
+                if is_right_sibling {
                     self.left_rotate(parent);
-                    other = parent.right();
-                }
-
-                if other.left().is_black_color() && other.right().is_black_color() {
-                    other.set_red_color();
-                    node = parent;
-                    parent = node.parent();
+                    sibling = parent.right();
                 } else {
-                    if other.right().is_black_color() {
-                        other.left().set_black_color();
-                        other.set_red_color();
-                        self.right_rotate(other);
-                        other = parent.right();
-                    }
-                    other.set_color(parent.get_color());
-                    parent.set_black_color();
-                    other.right().set_black_color();
-                    self.left_rotate(parent);
-                    node = self.root;
-                    break;
-                }
-            } else {
-                other = parent.left();
-                if other.is_red_color() {
-                    other.set_black_color();
-                    parent.set_red_color();
                     self.right_rotate(parent);
-                    other = parent.left();
-                }
-
-                if other.left().is_black_color() && other.right().is_black_color() {
-                    other.set_red_color();
-                    node = parent;
-                    parent = node.parent();
-                } else {
-                    if other.left().is_black_color() {
-                        other.right().set_black_color();
-                        other.set_red_color();
-                        self.left_rotate(other);
-                        other = parent.left();
-                    }
-                    other.set_color(parent.get_color());
-                    parent.set_black_color();
-                    other.left().set_black_color();
-                    self.right_rotate(parent);
-                    node = self.root;
-                    break;
+                    sibling = parent.left();
                 }
             }
-        }
 
-        node.set_black_color();
+            let mut sibleft = sibling.left();
+            let mut sibright = sibling.right();
+            if sibleft.is_black_color() && sibright.is_black_color() {
+                sibling.set_red_color();
+                node = parent;
+                parent = node.parent();
+            } else {
+                if is_right_sibling {
+                    if sibright.is_black_color() {
+                        sibleft.set_black_color();
+                        sibling.set_red_color();
+                        self.right_rotate(sibling);
+                        sibling = parent.right();
+                    }
+                } else {
+                    if sibleft.is_black_color() {
+                        sibright.set_black_color();
+                        sibling.set_red_color();
+                        self.left_rotate(sibling);
+                        sibling = parent.left();
+                    }
+                }
+                sibling.set_color(parent.get_color());
+                parent.set_black_color();
+                if is_right_sibling {
+                    sibling.right().set_black_color();
+                    self.left_rotate(parent);
+                } else {
+                    sibling.left().set_black_color();
+                    self.right_rotate(parent);
+                }
+                node = self.root;
+                break;
+            }
+        }
+        node.set_black_color()
     }
 
-    unsafe fn delete(&mut self, node: NodePtr<K, V>) -> (K, V) {
+    /*unsafe fn delete(&mut self, node: NodePtr<K, V>) -> (K, V) {
         let mut child;
         let mut parent;
         let color;
@@ -865,6 +838,48 @@ impl<K: Ord, V> RBTree<K, V> {
         }
 
         let obj = Box::from_raw(node.0);
+        return obj.pair();
+    }*/
+
+    unsafe fn delete(&mut self, node: NodePtr<K, V>) -> (K, V) {
+        let mut target = NodePtr::null();
+        if node.left().is_null() || node.right().is_null() {
+            target = node;
+        } else {
+            target = node.next();
+        }
+
+        let mut child = NodePtr::null();
+        if target.left().is_null() == false {
+            child = target.left();
+        } else {
+            child = target.right();
+        }
+
+        if child.is_null() == false {
+            child.set_parent(target.parent());
+        }
+
+        if target.parent().is_null() {
+            self.root = child;
+        } else {
+            if target == target.parent().left() {
+                target.parent().set_left(child);
+            } else {
+                target.parent().set_right(child);
+            }
+        }
+
+        if target != node {
+            target.swap_value(&node);
+        }
+
+        if target.is_black_color() {
+            self.delete_fixup(child, target.parent());
+        }
+
+        self.len -= 1;
+        let obj = Box::from_raw(target.0);
         return obj.pair();
     }
 
@@ -1057,6 +1072,8 @@ mod tests {
         assert_eq!(m.remove(&1).unwrap(), 2);
         assert_eq!(m.remove(&5).unwrap(), 3);
         assert_eq!(m.remove(&9).unwrap(), 4);
+        assert_eq!(m.remove(&3), None);
+        assert_eq!(m.remove(&9), None);
         assert_eq!(m.len(), 0);
     }
 
