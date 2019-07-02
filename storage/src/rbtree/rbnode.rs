@@ -1,7 +1,6 @@
 use std::cmp::Ord;
 use std::cmp::Ordering;
 use std::fmt::{self, Debug};
-use std::mem;
 use std::ptr;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -96,7 +95,7 @@ impl<K: Ord, V> NodePtr<K, V> {
         self.set_color(Color::Black);
     }
 
-    pub fn get_color(&self) -> Color {
+    pub fn get_color(self) -> Color {
         if self.is_null() {
             return Color::Black;
         }
@@ -111,36 +110,36 @@ impl<K: Ord, V> NodePtr<K, V> {
         unsafe { &(*self.0).value }
     }
 
-    pub fn is_red_color(&self) -> bool {
+    pub fn is_red_color(self) -> bool {
         self.get_color() == Color::Red
     }
 
-    pub fn is_black_color(&self) -> bool {
+    pub fn is_black_color(self) -> bool {
         self.get_color() == Color::Black
     }
 
-    pub fn is_left_child(&self) -> bool {
-        self.parent().left() == *self
+    pub fn is_left_child(self) -> bool {
+        self.parent().left() == self
     }
 
-    pub fn is_right_child(&self) -> bool {
-        self.parent().right() == *self
+    pub fn is_right_child(self) -> bool {
+        self.parent().right() == self
     }
 
-    pub fn min_node(&self) -> NodePtr<K, V> {
-        let mut node = *self;
+    pub fn min_node(self) -> NodePtr<K, V> {
+        let mut node = self;
         while !node.left().is_null() {
             node = node.left();
         }
-        return node;
+        node
     }
 
-    pub fn max_node(&self) -> NodePtr<K, V> {
-        let mut node = *self;
+    pub fn max_node(self) -> NodePtr<K, V> {
+        let mut node = self;
         while !node.right().is_null() {
             node = node.right();
         }
-        return node;
+        node
     }
 
     pub fn next(self) -> NodePtr<K, V> {
@@ -189,14 +188,14 @@ impl<K: Ord, V> NodePtr<K, V> {
         unsafe { (*self.0).right = right }
     }
 
-    pub fn parent(&self) -> NodePtr<K, V> {
-        unsafe { (*self.0).parent.clone() }
+    pub fn parent(self) -> NodePtr<K, V> {
+        unsafe { (*self.0).parent }
     }
 
-    pub fn grand_parent(&self) -> NodePtr<K, V> {
+    pub fn grand_parent(self) -> NodePtr<K, V> {
         let parent = self.parent();
         if parent.is_null() {
-            return NodePtr::null();
+            NodePtr::null()
         } else {
             parent.parent()
         }
@@ -212,7 +211,7 @@ impl<K: Ord, V> NodePtr<K, V> {
         }
     }
 
-    pub fn uncle(&self) -> NodePtr<K, V> {
+    pub fn uncle(self) -> NodePtr<K, V> {
         let grand_parent = self.grand_parent();
         if grand_parent.is_null() {
             return NodePtr::null();
@@ -225,25 +224,25 @@ impl<K: Ord, V> NodePtr<K, V> {
         }
     }
 
-    pub fn left(&self) -> NodePtr<K, V> {
-        unsafe { (*self.0).left.clone() }
+    pub fn left(self) -> NodePtr<K, V> {
+        unsafe { (*self.0).left }
     }
 
-    pub fn right(&self) -> NodePtr<K, V> {
-        unsafe { (*self.0).right.clone() }
+    pub fn right(self) -> NodePtr<K, V> {
+        unsafe { (*self.0).right }
     }
 
     pub fn null() -> NodePtr<K, V> {
         NodePtr(ptr::null_mut())
     }
 
-    pub fn is_null(&self) -> bool {
+    pub fn is_null(self) -> bool {
         self.0.is_null()
     }
 }
 
 impl<K: Ord + Clone, V: Clone> NodePtr<K, V> {
-    pub unsafe fn deep_clone(&self) -> NodePtr<K, V> {
+    pub unsafe fn deep_clone(self) -> NodePtr<K, V> {
         let mut node = NodePtr::new((*self.0).key.clone(), (*self.0).value.clone());
         if !self.left().is_null() {
             node.set_left(self.left().deep_clone());

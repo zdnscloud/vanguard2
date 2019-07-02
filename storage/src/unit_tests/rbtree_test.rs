@@ -1,4 +1,3 @@
-use crate::rbtree::rbnode::{Color, NodePtr};
 use crate::rbtree::rbtree::RBTree;
 use proptest::prelude::*;
 use std::fmt::Debug;

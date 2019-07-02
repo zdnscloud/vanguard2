@@ -22,7 +22,7 @@ pub struct FindResult {
 
 pub trait ZoneFinder {
     fn get_origin(&self) -> &Name;
-    fn find(name: &Name, typ: &RRType, opt: FindOption) -> FindResult;
+    fn find(name: &Name, typ: RRType, opt: FindOption) -> FindResult;
 }
 
 pub trait ZoneUpdator {

@@ -431,7 +431,7 @@ impl<K: Ord, V> RBTree<K, V> {
         let mut right = node.right();
         let mut rleft = right.left();
         node.set_right(rleft);
-        if rleft.is_null() == false {
+        if !rleft.is_null() {
             rleft.set_parent(node);
         }
 
@@ -451,7 +451,7 @@ impl<K: Ord, V> RBTree<K, V> {
         let mut left = node.left();
         let mut lright = left.right();
         node.set_left(lright);
-        if lright.is_null() == false {
+        if !lright.is_null() {
             lright.set_parent(node);
         }
 
@@ -476,7 +476,7 @@ impl<K: Ord, V> RBTree<K, V> {
 
             let mut uncle = node.uncle();
             let mut grand_parent = node.grand_parent();
-            if uncle.is_null() == false && uncle.is_red_color() {
+            if !uncle.is_null() && uncle.is_red_color() {
                 parent.set_black_color();
                 uncle.set_black_color();
                 grand_parent.set_red_color();
@@ -543,7 +543,7 @@ impl<K: Ord, V> RBTree<K, V> {
         unsafe {
             self.insert_fixup(node);
         }
-        return None;
+        None
     }
 
     pub fn find_node(&self, k: &K) -> NodePtr<K, V> {
@@ -594,7 +594,7 @@ impl<K: Ord, V> RBTree<K, V> {
             while !temp.left().is_null() {
                 temp = temp.left();
             }
-            return temp;
+            temp
         }
     }
 
@@ -606,7 +606,7 @@ impl<K: Ord, V> RBTree<K, V> {
             while !temp.right().is_null() {
                 temp = temp.right();
             }
-            return temp;
+            temp
         }
     }
 
@@ -742,13 +742,11 @@ impl<K: Ord, V> RBTree<K, V> {
                         self.right_rotate(sibling);
                         sibling = parent.right();
                     }
-                } else {
-                    if sibleft.is_black_color() {
-                        sibright.set_black_color();
-                        sibling.set_red_color();
-                        self.left_rotate(sibling);
-                        sibling = parent.left();
-                    }
+                } else if sibleft.is_black_color() {
+                    sibright.set_black_color();
+                    sibling.set_red_color();
+                    self.left_rotate(sibling);
+                    sibling = parent.left();
                 }
                 sibling.set_color(parent.get_color());
                 parent.set_black_color();
@@ -774,14 +772,12 @@ impl<K: Ord, V> RBTree<K, V> {
         self.len -= 1;
         if !node.left().is_null() && !node.right().is_null() {
             let mut replace = node.next();
-            if node == self.root {
+            if node.parent().is_null() {
                 self.root = replace;
+            } else if node.parent().left() == node {
+                node.parent().set_left(replace);
             } else {
-                if node.parent().left() == node {
-                    node.parent().set_left(replace);
-                } else {
-                    node.parent().set_right(replace);
-                }
+                node.parent().set_right(replace);
             }
 
             child = replace.right();
@@ -819,14 +815,12 @@ impl<K: Ord, V> RBTree<K, V> {
             child.set_parent(node.parent());
         }
 
-        if self.root == node {
+        if node.parent().is_null() {
             self.root = child
+        } else if node.parent().left() == node {
+            node.parent().set_left(child);
         } else {
-            if node.parent().left() == node {
-                node.parent().set_left(child);
-            } else {
-                node.parent().set_right(child);
-            }
+            node.parent().set_right(child);
         }
 
         if node.is_black_color() {
