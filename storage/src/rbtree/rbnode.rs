@@ -240,10 +240,6 @@ impl<K: Ord, V> NodePtr<K, V> {
     pub fn is_null(&self) -> bool {
         self.0.is_null()
     }
-
-    pub fn swap_value(&self, other: &NodePtr<K, V>) {
-        unsafe { mem::swap(&mut (*self.0).value, &mut (*other.0).value) }
-    }
 }
 
 impl<K: Ord + Clone, V: Clone> NodePtr<K, V> {

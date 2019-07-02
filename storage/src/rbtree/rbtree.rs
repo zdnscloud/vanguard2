@@ -767,44 +767,73 @@ impl<K: Ord, V> RBTree<K, V> {
     }
 
     unsafe fn delete(&mut self, node: NodePtr<K, V>) -> (K, V) {
-        let mut target = NodePtr::null();
-        if node.left().is_null() || node.right().is_null() {
-            target = node;
-        } else {
-            target = node.next();
-        }
+        let mut child;
+        let mut parent;
+        let color;
 
-        let mut child = NodePtr::null();
-        if target.left().is_null() == false {
-            child = target.left();
-        } else {
-            child = target.right();
-        }
-
-        if child.is_null() == false {
-            child.set_parent(target.parent());
-        }
-
-        if target.parent().is_null() {
-            self.root = child;
-        } else {
-            if target == target.parent().left() {
-                target.parent().set_left(child);
+        self.len -= 1;
+        if !node.left().is_null() && !node.right().is_null() {
+            let mut replace = node.next();
+            if node == self.root {
+                self.root = replace;
             } else {
-                target.parent().set_right(child);
+                if node.parent().left() == node {
+                    node.parent().set_left(replace);
+                } else {
+                    node.parent().set_right(replace);
+                }
+            }
+
+            child = replace.right();
+            parent = replace.parent();
+            color = replace.get_color();
+            if parent == node {
+                parent = replace;
+            } else {
+                if !child.is_null() {
+                    child.set_parent(parent);
+                }
+                parent.set_left(child);
+                replace.set_right(node.right());
+                node.right().set_parent(replace);
+            }
+
+            replace.set_parent(node.parent());
+            replace.set_color(node.get_color());
+            replace.set_left(node.left());
+            node.left().set_parent(replace);
+
+            if color == Color::Black {
+                self.delete_fixup(child, parent);
+            }
+
+            return Box::from_raw(node.0).pair();
+        }
+
+        if !node.left().is_null() {
+            child = node.left();
+        } else {
+            child = node.right();
+        }
+        if !child.is_null() {
+            child.set_parent(node.parent());
+        }
+
+        if self.root == node {
+            self.root = child
+        } else {
+            if node.parent().left() == node {
+                node.parent().set_left(child);
+            } else {
+                node.parent().set_right(child);
             }
         }
 
-        if target != node {
-            target.swap_value(&node);
+        if node.is_black_color() {
+            self.delete_fixup(child, node.parent());
         }
 
-        if target.is_black_color() {
-            self.delete_fixup(child, target.parent());
-        }
-
-        self.len -= 1;
-        Box::from_raw(target.0).pair()
+        Box::from_raw(node.0).pair()
     }
 
     pub fn keys(&self) -> Keys<K, V> {

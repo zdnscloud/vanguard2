@@ -3,3 +3,4 @@
 *.swo
 Cargo.lock
 **/*.rs.bk
+*/proptest-regressions
