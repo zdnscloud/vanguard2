@@ -766,81 +766,6 @@ impl<K: Ord, V> RBTree<K, V> {
         node.set_black_color()
     }
 
-    /*unsafe fn delete(&mut self, node: NodePtr<K, V>) -> (K, V) {
-        let mut child;
-        let mut parent;
-        let color;
-
-        self.len -= 1;
-        if !node.left().is_null() && !node.right().is_null() {
-            let mut replace = node.right().min_node();
-            if node == self.root {
-                self.root = replace;
-            } else {
-                if node.parent().left() == node {
-                    node.parent().set_left(replace);
-                } else {
-                    node.parent().set_right(replace);
-                }
-            }
-
-            child = replace.right();
-            parent = replace.parent();
-            color = replace.get_color();
-            if parent == node {
-                parent = replace;
-            } else {
-                if !child.is_null() {
-                    child.set_parent(parent);
-                }
-                parent.set_left(child);
-                replace.set_right(node.right());
-                node.right().set_parent(replace);
-            }
-
-            replace.set_parent(node.parent());
-            replace.set_color(node.get_color());
-            replace.set_left(node.left());
-            node.left().set_parent(replace);
-
-            if color == Color::Black {
-                self.delete_fixup(child, parent);
-            }
-
-            let obj = Box::from_raw(node.0);
-            return obj.pair();
-        }
-
-        if !node.left().is_null() {
-            child = node.left();
-        } else {
-            child = node.right();
-        }
-
-        parent = node.parent();
-        color = node.get_color();
-        if !child.is_null() {
-            child.set_parent(parent);
-        }
-
-        if self.root == node {
-            self.root = child
-        } else {
-            if parent.left() == node {
-                parent.set_left(child);
-            } else {
-                parent.set_right(child);
-            }
-        }
-
-        if color == Color::Black {
-            self.delete_fixup(child, parent);
-        }
-
-        let obj = Box::from_raw(node.0);
-        return obj.pair();
-    }*/
-
     unsafe fn delete(&mut self, node: NodePtr<K, V>) -> (K, V) {
         let mut target = NodePtr::null();
         if node.left().is_null() || node.right().is_null() {
@@ -879,8 +804,7 @@ impl<K: Ord, V> RBTree<K, V> {
         }
 
         self.len -= 1;
-        let obj = Box::from_raw(target.0);
-        return obj.pair();
+        Box::from_raw(target.0).pair()
     }
 
     pub fn keys(&self) -> Keys<K, V> {
