@@ -7,3 +7,4 @@ publish = false
 
 [dependencies]
 r53 = { git = "https://github.com/zdnscloud/r53"}
+failure_ext = { git = "https://github.com/zdnscloud/cement-rs"}

@@ -13,14 +13,12 @@ pub struct RBTree<K: Ord, V> {
     len: usize,
 }
 
-// Drop all owned pointers if the tree is dropped
 impl<K: Ord, V> Drop for RBTree<K, V> {
     fn drop(&mut self) {
         self.clear();
     }
 }
 
-/// If key and value are both impl Clone, we can call clone to get a copy.
 impl<K: Ord + Clone, V: Clone> Clone for RBTree<K, V> {
     fn clone(&self) -> RBTree<K, V> {
         unsafe {
@@ -42,7 +40,6 @@ where
     }
 }
 
-/// This is a method to help us to get inner struct.
 impl<K: Ord + Debug, V: Debug> RBTree<K, V> {
     fn tree_print(&self, node: NodePtr<K, V>, direction: i32) {
         if node.is_null() {
@@ -120,7 +117,6 @@ impl<K: Ord, V> FromIterator<(K, V)> for RBTree<K, V> {
     }
 }
 
-/// RBTree into iter
 impl<K: Ord, V> Extend<(K, V)> for RBTree<K, V> {
     fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, iter: T) {
         let iter = iter.into_iter();
@@ -220,14 +216,12 @@ impl<'a, K: Ord, V> Iterator for ValuesMut<'a, K, V> {
     }
 }
 
-/// Convert RBTree to iter, move out the tree.
 pub struct IntoIter<K: Ord, V> {
     head: NodePtr<K, V>,
     tail: NodePtr<K, V>,
     len: usize,
 }
 
-// Drop all owned pointers if the collection is dropped
 impl<K: Ord, V> Drop for IntoIter<K, V> {
     fn drop(&mut self) {
         for (_, _) in self {}
@@ -321,7 +315,6 @@ impl<'a, K: Ord + 'a, V: 'a> Iterator for Iter<'a, K, V> {
 
 impl<'a, K: Ord + 'a, V: 'a> DoubleEndedIterator for Iter<'a, K, V> {
     fn next_back(&mut self) -> Option<(&'a K, &'a V)> {
-        // println!("len = {:?}", self.len);
         if self.len == 0 {
             return None;
         }
@@ -571,25 +564,44 @@ impl<K: Ord, V> RBTree<K, V> {
         return None;
     }
 
-    fn find_node(&self, k: &K) -> NodePtr<K, V> {
-        if self.root.is_null() {
-            return NodePtr::null();
-        }
-        let mut temp = &self.root;
+    pub fn find_node(&self, k: &K) -> NodePtr<K, V> {
+        let mut current = self.root;
         unsafe {
             loop {
-                let next = match k.cmp(&(*temp.0).key) {
-                    Ordering::Less => &mut (*temp.0).left,
-                    Ordering::Greater => &mut (*temp.0).right,
-                    Ordering::Equal => return *temp,
-                };
-                if next.is_null() {
+                if current.is_null() {
                     break;
                 }
-                temp = next;
+                let next = match k.cmp(&(*current.0).key) {
+                    Ordering::Less => (*current.0).left,
+                    Ordering::Greater => (*current.0).right,
+                    Ordering::Equal => return current,
+                };
+                current = next;
             }
         }
         NodePtr::null()
+    }
+
+    pub fn find_less_equal(&self, k: &K) -> (NodePtr<K, V>, bool) {
+        let mut less = NodePtr::null();
+        let mut current = self.root;
+        unsafe {
+            loop {
+                if current.is_null() {
+                    break;
+                }
+                let next = match k.cmp(&(*current.0).key) {
+                    Ordering::Less => (*current.0).left,
+                    Ordering::Greater => {
+                        less = current;
+                        (*current.0).right
+                    }
+                    Ordering::Equal => return (current, true),
+                };
+                current = next;
+            }
+        }
+        (less, false)
     }
 
     fn first_child(&self) -> NodePtr<K, V> {
@@ -706,7 +718,6 @@ impl<K: Ord, V> RBTree<K, V> {
         self.clear_recurse(root);
     }
 
-    /// Empties the `RBTree` without freeing objects in it.
     fn fast_clear(&mut self) {
         self.root = NodePtr::null();
     }
@@ -1002,6 +1013,7 @@ mod tests {
     #[test]
     fn test_find_mut() {
         let mut m = RBTree::new();
+        assert_eq!(m.get_mut(&5), None);
         m.insert(1, 12);
         m.insert(2, 8);
         m.insert(5, 14);
@@ -1011,6 +1023,24 @@ mod tests {
             Some(x) => *x = new,
         }
         assert_eq!(m.get(&5), Some(&new));
+    }
+
+    #[test]
+    fn test_find_less_eqaul() {
+        let mut m = RBTree::new();
+        let (node, found) = m.find_less_equal(&5);
+        assert!(node.is_null());
+        assert_eq!(found, false);
+        m.insert(1, 12);
+        m.insert(2, 8);
+        m.insert(5, 14);
+        let (node, found) = m.find_less_equal(&3);
+        assert_eq!(*node.get_key(), 2);
+        assert_eq!(found, false);
+
+        let (node, found) = m.find_less_equal(&5);
+        assert_eq!(*node.get_key(), 5);
+        assert_eq!(found, true);
     }
 
     #[test]

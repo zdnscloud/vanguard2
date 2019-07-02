@@ -106,6 +106,10 @@ impl<K: Ord, V> NodePtr<K, V> {
         unsafe { &(*self.0).key }
     }
 
+    pub fn get_value(&self) -> &V {
+        unsafe { &(*self.0).value }
+    }
+
     pub fn is_red_color(&self) -> bool {
         self.get_color() == Color::Red
     }
