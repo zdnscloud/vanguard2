@@ -298,10 +298,9 @@ impl<T> RBTree<T> {
                 }
                 NameRelation::SubDomain => {
                     result.flag = FindResultFlag::PartialMatch;
-                    result.node = node;
                     chain.push(node);
-                    target =
-                        target.strip_right(chain.last_compared_result.common_label_count as usize);
+                    target = target
+                        .strip_right((chain.last_compared_result.common_label_count - 1) as usize);
                     node = node.down();
                 }
                 _ => {
@@ -355,8 +354,8 @@ mod tests {
     use crate::domaintree::test_helper::name_from_string;
     use r53::Name;
 
-    fn build_tree() -> RBTree<i32> {
-        let names = vec![
+    fn sample_names() -> Vec<(String, i32)> {
+        vec![
             "c",
             "b",
             "a",
@@ -368,12 +367,18 @@ mod tests {
             "j.z.d.e.f",
             "p.w.y.d.e.f",
             "q.w.y.d.e.f",
-        ];
+        ]
+        .iter()
+        .zip(0..)
+        .map(|(s, i)| (s.to_string(), i))
+        .collect()
+    }
+
+    fn build_tree() -> RBTree<i32> {
+        let names = sample_names();
         let mut tree = RBTree::new();
-        let mut value = 0;
-        for k in &names {
-            tree.insert(name_from_string(k), value);
-            value += 1;
+        for (k, v) in names {
+            tree.insert(name_from_string(k.as_ref()), v);
         }
         tree
     }
@@ -382,8 +387,19 @@ mod tests {
     fn test_find() {
         let tree = build_tree();
         assert_eq!(tree.len(), 13);
-        let result = tree.find_node(&name_from_string("c"));
-        assert_eq!(result.flag, FindResultFlag::ExacatMatch);
-        assert_eq!(result.node.get_value(), &Some(0));
+
+        for (n, v) in sample_names() {
+            let result = tree.find_node(&name_from_string(n.as_ref()));
+            println!("---> find name {}", n);
+            assert_eq!(result.flag, FindResultFlag::ExacatMatch);
+            assert_eq!(result.node.get_value(), &Some(v));
+        }
+
+        let none_terminal = vec!["d.e.f", "w.y.d.e.f"];
+        for n in &none_terminal {
+            let result = tree.find_node(&name_from_string(n));
+            assert_eq!(result.flag, FindResultFlag::ExacatMatch);
+            assert_eq!(result.node.get_value(), &None);
+        }
     }
 }
