@@ -1,4 +1,4 @@
-use crate::rbtree::rbtree::RBTree;
+use crate::domaintree::rbtree::RBTree;
 use proptest::prelude::*;
 use std::fmt::Debug;
 
