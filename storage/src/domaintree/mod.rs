@@ -1,2 +1,2 @@
-pub mod rbnode;
-pub mod rbtree;
+pub mod node;
+pub mod tree;
