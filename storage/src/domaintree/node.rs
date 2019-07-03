@@ -1,12 +1,12 @@
 use r53::Name;
 use std::cmp::Ordering;
 use std::fmt::{self, Debug};
-use std::mem::swap;
+use std::mem::{replace, swap};
 use std::ptr;
 
-const COLOR_MASK: u16 = 0x0001;
-const CALLBACK_MASK: u16 = 0x0002;
-const SUBTREE_ROOT_MASK: u16 = 0x0004;
+pub const COLOR_MASK: u16 = 0x0001;
+pub const CALLBACK_MASK: u16 = 0x0002;
+pub const SUBTREE_ROOT_MASK: u16 = 0x0004;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Color {
@@ -18,7 +18,7 @@ pub enum Color {
 pub struct NodeFlag(u16);
 impl NodeFlag {
     pub fn set_flag(&mut self, mask: u16) {
-        self.0 |= COLOR_MASK
+        self.0 |= mask
     }
 
     pub fn clear_flag(&mut self, mask: u16) {
@@ -43,11 +43,11 @@ pub struct RBTreeNode<T> {
     pub parent: NodePtr<T>,
     pub down: NodePtr<T>,
     pub name: Name,
-    pub value: T,
+    pub value: Option<T>,
 }
 
 impl<T> RBTreeNode<T> {
-    pub fn pair(self) -> (Name, T) {
+    pub fn pair(self) -> (Name, Option<T>) {
         (self.name, self.value)
     }
 }
@@ -100,7 +100,7 @@ impl<T> PartialEq for NodePtr<T> {
 impl<T> Eq for NodePtr<T> {}
 
 impl<T> NodePtr<T> {
-    pub fn new(name: Name, v: T) -> NodePtr<T> {
+    pub fn new(name: Name, v: Option<T>) -> NodePtr<T> {
         let node = RBTreeNode {
             flag: NodeFlag::default(),
             left: NodePtr::null(),
@@ -154,15 +154,21 @@ impl<T> NodePtr<T> {
         unsafe { (*self.0).flag.is_flag_set(mask) }
     }
 
-    pub fn get_key(&self) -> &Name {
+    pub fn get_name(&self) -> &Name {
         unsafe { &(*self.0).name }
     }
 
-    pub fn get_value(&self) -> &T {
+    pub fn get_value(&self) -> &Option<T> {
         unsafe { &(*self.0).value }
     }
 
-    pub fn set_value(&mut self, v: T) -> T {
+    pub fn set_name(&mut self, n: Name) {
+        unsafe {
+            replace(&mut (*self.0).name, n);
+        }
+    }
+
+    pub fn set_value(&mut self, v: Option<T>) -> Option<T> {
         let mut back = v;
         unsafe {
             swap(&mut (*self.0).value, &mut back);
@@ -238,20 +244,28 @@ impl<T> NodePtr<T> {
         }
     }
 
-    pub fn set_parent(&mut self, parent: NodePtr<T>) {
+    pub fn set_parent(self, parent: NodePtr<T>) {
         unsafe { (*self.0).parent = parent }
     }
 
-    pub fn set_left(&mut self, left: NodePtr<T>) {
+    pub fn set_left(self, left: NodePtr<T>) {
         unsafe { (*self.0).left = left }
     }
 
-    pub fn set_right(&mut self, right: NodePtr<T>) {
+    pub fn set_right(self, right: NodePtr<T>) {
         unsafe { (*self.0).right = right }
     }
 
     pub fn parent(self) -> NodePtr<T> {
         unsafe { (*self.0).parent }
+    }
+
+    pub fn down(self) -> NodePtr<T> {
+        unsafe { (*self.0).down }
+    }
+
+    pub fn set_down(self, down: NodePtr<T>) {
+        unsafe { (*self.0).down = down }
     }
 
     pub fn grand_parent(self) -> NodePtr<T> {
@@ -313,6 +327,18 @@ impl<T> NodePtr<T> {
     pub fn is_null(self) -> bool {
         self.0.is_null()
     }
+
+    pub fn get_pointer(self) -> *mut RBTreeNode<T> {
+        self.0
+    }
+
+    pub fn get_double_pointer(&mut self) -> *mut *mut RBTreeNode<T> {
+        &mut self.0
+    }
+
+    pub fn get_double_pointer_of_down(&mut self) -> *mut *mut RBTreeNode<T> {
+        unsafe { &mut (*self.0).down.0 }
+    }
 }
 
 impl<T: Clone> NodePtr<T> {
@@ -332,10 +358,13 @@ impl<T: Clone> NodePtr<T> {
 
 mod tests {
     use super::NodePtr;
+    use crate::domaintree::test_helper::name_from_string;
+    use r53::Name;
 
     #[test]
     fn test_set_value() {
-        let mut n = NodePtr::new("k1", Some("v1"));
+        let name = name_from_string("k1");
+        let mut n = NodePtr::new(name.clone(), Some("v1"));
         assert_eq!(n.get_value(), &Some("v1"));
         let old = n.set_value(Some("v2"));
         assert_eq!(old, Some("v1"));
@@ -345,4 +374,24 @@ mod tests {
         assert_eq!(old, Some("v2"));
         assert_eq!(n.get_value(), &None);
     }
+
+    #[test]
+    fn test_double_pointer() {
+        let name1 = name_from_string("k1");
+        let name2 = name_from_string("k1");
+        let name3 = name_from_string("k1");
+        let mut n1 = NodePtr::new(name1.clone(), Some("v1"));
+        let mut n2 = NodePtr::new(name1.clone(), Some("v2"));
+        let mut n3 = NodePtr::new(name1.clone(), Some("v3"));
+
+        assert_eq!(n1.get_value(), &Some("v1"));
+        assert!(n1.down().is_null());
+
+        let mut pp = n1.get_double_pointer_of_down();
+        unsafe {
+            *pp = n2.get_pointer();
+        }
+        assert_eq!(n1.down().get_value(), &Some("v2"));
+    }
+
 }

@@ -1,4 +1,4 @@
-use r53::Name;
+use r53::{Name, NameRelation};
 use std::cmp::Ord;
 use std::cmp::Ordering;
 use std::fmt::{self, Debug};
@@ -7,7 +7,29 @@ use std::marker;
 use std::mem;
 use std::ops::Index;
 
-use crate::domaintree::node::{Color, NodePtr};
+use crate::domaintree::node::{Color, NodePtr, RBTreeNode, COLOR_MASK, SUBTREE_ROOT_MASK};
+use crate::domaintree::node_chain::NodeChain;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum FindResultFlag {
+    ExacatMatch,
+    NotFound,
+    PartialMatch,
+}
+
+pub struct FindResult<T> {
+    pub node: NodePtr<T>,
+    pub flag: FindResultFlag,
+}
+
+impl<T> FindResult<T> {
+    fn new() -> Self {
+        FindResult {
+            node: NodePtr::null(),
+            flag: FindResultFlag::NotFound,
+        }
+    }
+}
 
 pub struct RBTree<T> {
     root: NodePtr<T>,
@@ -31,335 +53,6 @@ impl<T: Clone> Clone for RBTree<T> {
     }
 }
 
-impl<T: Debug> Debug for RBTree<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_map().entries(self.iter()).finish()
-    }
-}
-
-impl<T: PartialEq> PartialEq for RBTree<T> {
-    fn eq(&self, other: &RBTree<T>) -> bool {
-        if self.len() != other.len() {
-            return false;
-        }
-
-        self.iter()
-            .all(|(name, value)| other.get(name).map_or(false, |v| *value == *v))
-    }
-}
-
-impl<T: Eq> Eq for RBTree<T> {}
-
-impl<'a, T> Index<&'a Name> for RBTree<T> {
-    type Output = T;
-
-    fn index(&self, index: &Name) -> &T {
-        self.get(index).expect("no entry found for name")
-    }
-}
-
-impl<T> FromIterator<(Name, T)> for RBTree<T> {
-    fn from_iter<I: IntoIterator<Item = (Name, T)>>(iter: I) -> RBTree<T> {
-        let mut tree = RBTree::new();
-        tree.extend(iter);
-        tree
-    }
-}
-
-impl<T> Extend<(Name, T)> for RBTree<T> {
-    fn extend<I: IntoIterator<Item = (Name, T)>>(&mut self, iter: I) {
-        let iter = iter.into_iter();
-        for (k, v) in iter {
-            self.insert(k, v);
-        }
-    }
-}
-
-pub struct Keys<'a, T: 'a> {
-    inner: Iter<'a, T>,
-}
-
-impl<'a, T> Clone for Keys<'a, T> {
-    fn clone(&self) -> Keys<'a, T> {
-        Keys {
-            inner: self.inner.clone(),
-        }
-    }
-}
-
-impl<'a, T> fmt::Debug for Keys<'a, T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_list().entries(self.clone()).finish()
-    }
-}
-
-impl<'a, T> Iterator for Keys<'a, T> {
-    type Item = &'a Name;
-
-    fn next(&mut self) -> Option<(&'a Name)> {
-        self.inner.next().map(|(k, _)| k)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-pub struct Values<'a, T: 'a> {
-    inner: Iter<'a, T>,
-}
-
-impl<'a, T> Clone for Values<'a, T> {
-    fn clone(&self) -> Values<'a, T> {
-        Values {
-            inner: self.inner.clone(),
-        }
-    }
-}
-
-impl<'a, T: Debug> fmt::Debug for Values<'a, T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_list().entries(self.clone()).finish()
-    }
-}
-
-impl<'a, T> Iterator for Values<'a, T> {
-    type Item = &'a T;
-
-    fn next(&mut self) -> Option<(&'a T)> {
-        self.inner.next().map(|(_, v)| v)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-pub struct ValuesMut<'a, T: 'a> {
-    inner: IterMut<'a, T>,
-}
-
-impl<'a, T> Clone for ValuesMut<'a, T> {
-    fn clone(&self) -> ValuesMut<'a, T> {
-        ValuesMut {
-            inner: self.inner.clone(),
-        }
-    }
-}
-
-impl<'a, T: Debug> fmt::Debug for ValuesMut<'a, T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_list().entries(self.clone()).finish()
-    }
-}
-
-impl<'a, T> Iterator for ValuesMut<'a, T> {
-    type Item = &'a mut T;
-
-    fn next(&mut self) -> Option<(&'a mut T)> {
-        self.inner.next().map(|(_, v)| v)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-pub struct IntoIter<T> {
-    head: NodePtr<T>,
-    tail: NodePtr<T>,
-    len: usize,
-}
-
-impl<T> Drop for IntoIter<T> {
-    fn drop(&mut self) {
-        for (_, _) in self {}
-    }
-}
-
-impl<T> Iterator for IntoIter<T> {
-    type Item = (Name, T);
-
-    fn next(&mut self) -> Option<(Name, T)> {
-        if self.len == 0 {
-            return None;
-        }
-
-        if self.head.is_null() {
-            return None;
-        }
-
-        let next = self.head.next();
-        let obj = unsafe { Box::from_raw(self.head.0) };
-        let (k, v) = obj.pair();
-        self.head = next;
-        self.len -= 1;
-        Some((k, v))
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.len, Some(self.len))
-    }
-}
-
-impl<T> DoubleEndedIterator for IntoIter<T> {
-    fn next_back(&mut self) -> Option<(Name, T)> {
-        if self.len == 0 {
-            return None;
-        }
-
-        if self.tail.is_null() {
-            return None;
-        }
-
-        let prev = self.tail.prev();
-        let obj = unsafe { Box::from_raw(self.tail.0) };
-        let (k, v) = obj.pair();
-        self.tail = prev;
-        self.len -= 1;
-        Some((k, v))
-    }
-}
-
-pub struct Iter<'a, T: 'a> {
-    head: NodePtr<T>,
-    tail: NodePtr<T>,
-    len: usize,
-    _marker: marker::PhantomData<&'a ()>,
-}
-
-impl<'a, T: 'a> Clone for Iter<'a, T> {
-    fn clone(&self) -> Iter<'a, T> {
-        Iter {
-            head: self.head,
-            tail: self.tail,
-            len: self.len,
-            _marker: self._marker,
-        }
-    }
-}
-
-impl<'a, T: 'a> Iterator for Iter<'a, T> {
-    type Item = (&'a Name, &'a T);
-
-    fn next(&mut self) -> Option<(&'a Name, &'a T)> {
-        if self.len == 0 {
-            return None;
-        }
-
-        if self.head.is_null() {
-            return None;
-        }
-
-        let (k, v) = unsafe { (&(*self.head.0).name, &(*self.head.0).value) };
-        self.head = self.head.next();
-        self.len -= 1;
-        Some((k, v))
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.len, Some(self.len))
-    }
-}
-
-impl<'a, T: 'a> DoubleEndedIterator for Iter<'a, T> {
-    fn next_back(&mut self) -> Option<(&'a Name, &'a T)> {
-        if self.len == 0 {
-            return None;
-        }
-
-        if self.tail == self.head {
-            return None;
-        }
-
-        let (k, v) = unsafe { (&(*self.tail.0).name, &(*self.tail.0).value) };
-        self.tail = self.tail.prev();
-        self.len -= 1;
-        Some((k, v))
-    }
-}
-
-pub struct IterMut<'a, T: 'a> {
-    head: NodePtr<T>,
-    tail: NodePtr<T>,
-    len: usize,
-    _marker: marker::PhantomData<&'a ()>,
-}
-
-impl<'a, T: 'a> Clone for IterMut<'a, T> {
-    fn clone(&self) -> IterMut<'a, T> {
-        IterMut {
-            head: self.head,
-            tail: self.tail,
-            len: self.len,
-            _marker: self._marker,
-        }
-    }
-}
-
-impl<'a, T: 'a> Iterator for IterMut<'a, T> {
-    type Item = (&'a Name, &'a mut T);
-
-    fn next(&mut self) -> Option<(&'a Name, &'a mut T)> {
-        if self.len == 0 {
-            return None;
-        }
-
-        if self.head.is_null() {
-            return None;
-        }
-
-        let (k, v) = unsafe { (&(*self.head.0).name, &mut (*self.head.0).value) };
-        self.head = self.head.next();
-        self.len -= 1;
-        Some((k, v))
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.len, Some(self.len))
-    }
-}
-
-impl<'a, T: 'a> DoubleEndedIterator for IterMut<'a, T> {
-    fn next_back(&mut self) -> Option<(&'a Name, &'a mut T)> {
-        if self.len == 0 {
-            return None;
-        }
-
-        if self.tail == self.head {
-            return None;
-        }
-
-        let (k, v) = unsafe { (&(*self.tail.0).name, &mut (*self.tail.0).value) };
-        self.tail = self.tail.prev();
-        self.len -= 1;
-        Some((k, v))
-    }
-}
-
-impl<T> IntoIterator for RBTree<T> {
-    type Item = (Name, T);
-    type IntoIter = IntoIter<T>;
-
-    fn into_iter(mut self) -> IntoIter<T> {
-        let iter = if self.root.is_null() {
-            IntoIter {
-                head: NodePtr::null(),
-                tail: NodePtr::null(),
-                len: self.len,
-            }
-        } else {
-            IntoIter {
-                head: self.first_child(),
-                tail: self.last_child(),
-                len: self.len,
-            }
-        };
-        self.fast_clear();
-        iter
-    }
-}
-
 impl<T> RBTree<T> {
     pub fn new() -> RBTree<T> {
         RBTree {
@@ -376,7 +69,7 @@ impl<T> RBTree<T> {
         self.root.is_null()
     }
 
-    unsafe fn left_rotate(&mut self, mut node: NodePtr<T>) {
+    unsafe fn left_rotate(&mut self, root: *mut *mut RBTreeNode<T>, mut node: NodePtr<T>) {
         let mut right = node.right();
         let mut rleft = right.left();
         node.set_right(rleft);
@@ -384,19 +77,25 @@ impl<T> RBTree<T> {
             rleft.set_parent(node);
         }
 
-        right.set_parent(node.parent());
-        if node == self.root {
-            self.root = right;
-        } else if node == node.parent().left() {
-            node.parent().set_left(right);
+        let mut parent = node.parent();
+        right.set_parent(parent);
+        if !node.is_flag_set(SUBTREE_ROOT_MASK) {
+            right.clear_flag(SUBTREE_ROOT_MASK);
+            if node == parent.left() {
+                parent.set_left(right);
+            } else {
+                parent.set_right(right);
+            }
         } else {
-            node.parent().set_right(right);
+            right.set_flag(SUBTREE_ROOT_MASK);
+            *root = right.get_pointer();
         }
         right.set_left(node);
         node.set_parent(right);
+        node.clear_flag(SUBTREE_ROOT_MASK);
     }
 
-    unsafe fn right_rotate(&mut self, mut node: NodePtr<T>) {
+    unsafe fn right_rotate(&mut self, root: *mut *mut RBTreeNode<T>, mut node: NodePtr<T>) {
         let mut left = node.left();
         let mut lright = left.right();
         node.set_left(lright);
@@ -404,20 +103,27 @@ impl<T> RBTree<T> {
             lright.set_parent(node);
         }
 
-        left.set_parent(node.parent());
-        if node == self.root {
-            self.root = left;
-        } else if node == node.parent().right() {
-            node.parent().set_right(left);
+        let parent = node.parent();
+        left.set_parent(parent);
+        if !node.is_flag_set(SUBTREE_ROOT_MASK) {
+            left.clear_flag(SUBTREE_ROOT_MASK);
+            if node == parent.right() {
+                parent.set_right(left);
+            } else {
+                parent.set_left(left);
+            }
         } else {
-            node.parent().set_left(left);
+            left.set_flag(SUBTREE_ROOT_MASK);
+            *root = left.get_pointer();
         }
         left.set_right(node);
         node.set_parent(left);
+        node.clear_flag(SUBTREE_ROOT_MASK);
     }
 
-    unsafe fn insert_fixup(&mut self, mut node: NodePtr<T>) {
-        while node != self.root {
+    unsafe fn insert_fixup(&mut self, root: *mut *mut RBTreeNode<T>, node_: NodePtr<T>) {
+        let mut node = node_;
+        while node.get_pointer() != *root {
             let mut parent = node.parent();
             if parent.is_black() {
                 break;
@@ -433,204 +139,177 @@ impl<T> RBTree<T> {
             } else {
                 if node == parent.right() && parent == grand_parent.left() {
                     node = parent;
-                    self.left_rotate(parent);
+                    self.left_rotate(root, parent);
                 } else if node == parent.left() && parent == grand_parent.right() {
                     node = parent;
-                    self.right_rotate(parent);
+                    self.right_rotate(root, parent);
                 }
                 parent = node.parent();
                 parent.set_color(Color::Black);
                 grand_parent.set_color(Color::Red);
                 if node == parent.left() {
-                    self.right_rotate(grand_parent);
+                    self.right_rotate(root, grand_parent);
                 } else {
-                    self.left_rotate(grand_parent);
+                    self.left_rotate(root, grand_parent);
                 }
                 break;
             }
         }
-        self.root.set_color(Color::Black);
+        (**root).flag.set_flag(COLOR_MASK);
     }
 
-    pub fn insert(&mut self, k: Name, v: T) -> Option<T> {
-        let mut y = NodePtr::null();
-        let mut x = self.root;
+    pub fn insert(&mut self, target_: Name, v: T) -> Option<Option<T>> {
+        let mut parent = NodePtr::null();
+        let mut up = NodePtr::null();
+        let mut current = self.root;
+        let mut order = -1;
+        let mut target = target_;
 
-        while !x.is_null() {
-            y = x;
-            match k.cmp(x.get_key()) {
-                Ordering::Less => {
-                    x = x.left();
-                }
-                Ordering::Equal => unsafe {
-                    return Some(mem::replace(&mut (*x.0).value, v));
+        println!("insert {}", target);
+        while !current.is_null() {
+            let compare_result = target.get_relation(current.get_name());
+            match compare_result.relation {
+                NameRelation::Equal => unsafe {
+                    return Some(mem::replace(&mut (*current.0).value, Some(v)));
                 },
-                Ordering::Greater => {
-                    x = x.right();
+                NameRelation::None => {
+                    println!("into same tree");
+                    parent = current;
+                    order = compare_result.order;
+                    current = if order < 0 {
+                        current.left()
+                    } else {
+                        current.right()
+                    };
                 }
-            };
-        }
-
-        self.len += 1;
-        let mut node = NodePtr::new(k, v);
-        node.set_parent(y);
-
-        if y.is_null() {
-            self.root = node;
-        } else {
-            match node.cmp(&&mut y) {
-                Ordering::Less => {
-                    y.set_left(node);
+                NameRelation::SubDomain => {
+                    println!("into sub domain");
+                    parent = NodePtr::null();
+                    up = current;
+                    target = target.strip_right((compare_result.common_label_count - 1) as usize);
+                    current = current.down();
                 }
                 _ => {
-                    y.set_right(node);
+                    let common_ancestor = target.strip_left(
+                        (target.label_count - compare_result.common_label_count) as usize,
+                    );
+                    let new_name = current
+                        .get_name()
+                        .strip_right((compare_result.common_label_count - 1) as usize);
+                    println!(
+                        "common {}, new {}",
+                        common_ancestor.to_string(),
+                        new_name.to_string()
+                    );
+                    unsafe {
+                        self.node_fission(&mut current, new_name, common_ancestor);
+                    }
+                    current = current.parent();
                 }
-            };
+            }
         }
 
-        node.set_color(Color::Red);
-        unsafe {
-            self.insert_fixup(node);
+        let mut current_root = if !up.is_null() {
+            up.get_double_pointer_of_down()
+        } else {
+            self.root.get_double_pointer()
+        };
+        self.len += 1;
+        let mut node = NodePtr::new(target, Some(v));
+        node.set_parent(parent);
+        if parent.is_null() {
+            unsafe {
+                *current_root = node.get_pointer();
+            }
+            node.set_color(Color::Black);
+            node.set_flag(SUBTREE_ROOT_MASK);
+            node.set_parent(up);
+        } else if order < 0 {
+            node.clear_flag(SUBTREE_ROOT_MASK);
+            parent.set_left(node);
+            unsafe {
+                self.insert_fixup(current_root, node);
+            }
+        } else {
+            node.clear_flag(SUBTREE_ROOT_MASK);
+            parent.set_right(node);
+            unsafe {
+                self.insert_fixup(current_root, node);
+            }
         }
         None
     }
 
-    pub fn find_node(&self, k: &Name) -> NodePtr<T> {
-        let mut current = self.root;
-        unsafe {
-            loop {
-                if current.is_null() {
-                    break;
-                }
-                let next = match k.cmp(&(*current.0).name) {
-                    Ordering::Less => (*current.0).left,
-                    Ordering::Greater => (*current.0).right,
-                    Ordering::Equal => return current,
-                };
-                current = next;
-            }
+    unsafe fn node_fission(&mut self, node: &mut NodePtr<T>, new_prefix: Name, new_suffix: Name) {
+        println!(
+            "do fission with old name: {}, new name {}, common {}",
+            node.get_name(),
+            new_prefix,
+            new_suffix
+        );
+        let mut up = NodePtr::new(new_suffix, None);
+        node.set_name(new_prefix);
+        up.set_parent(node.parent());
+        connect_child(self.root.get_double_pointer(), *node, *node, up);
+        up.set_down(*node);
+        node.set_parent(up);
+        up.set_left(node.left());
+        if !node.left().is_null() {
+            node.left().set_parent(up);
         }
-        NodePtr::null()
+        up.set_right(node.right());
+        if !node.right().is_null() {
+            node.right().set_parent(up);
+        }
+        node.set_left(NodePtr::null());
+        node.set_right(NodePtr::null());
+        up.set_color(node.get_color());
+        node.set_color(Color::Black);
+        if node.is_flag_set(SUBTREE_ROOT_MASK) {
+            up.set_flag(SUBTREE_ROOT_MASK);
+        } else {
+            up.clear_flag(SUBTREE_ROOT_MASK);
+        }
+        node.set_flag(SUBTREE_ROOT_MASK);
+        self.len += 1;
     }
 
-    pub fn find_less_equal(&self, k: &Name) -> (NodePtr<T>, bool) {
-        let mut less = NodePtr::null();
-        let mut current = self.root;
-        unsafe {
-            loop {
-                if current.is_null() {
+    pub fn find_node(&self, target_: &Name) -> FindResult<T> {
+        let mut node = self.root;
+        let mut chain = NodeChain::new();
+        let mut result = FindResult::new();
+        let mut target = target_.clone();
+        while !node.is_null() {
+            chain.last_compared = node;
+            chain.last_compared_result = target.get_relation(node.get_name());
+            match chain.last_compared_result.relation {
+                NameRelation::Equal => {
+                    chain.push(node);
+                    result.flag = FindResultFlag::ExacatMatch;
+                    result.node = node;
                     break;
                 }
-                let next = match k.cmp(&(*current.0).name) {
-                    Ordering::Less => (*current.0).left,
-                    Ordering::Greater => {
-                        less = current;
-                        (*current.0).right
+                NameRelation::None => {
+                    if chain.last_compared_result.order < 0 {
+                        node = node.left();
+                    } else {
+                        node = node.right();
                     }
-                    Ordering::Equal => return (current, true),
-                };
-                current = next;
+                }
+                NameRelation::SubDomain => {
+                    result.flag = FindResultFlag::PartialMatch;
+                    result.node = node;
+                    chain.push(node);
+                    target =
+                        target.strip_right(chain.last_compared_result.common_label_count as usize);
+                    node = node.down();
+                }
+                _ => {
+                    break;
+                }
             }
         }
-        (less, false)
-    }
-
-    fn first_child(&self) -> NodePtr<T> {
-        if self.root.is_null() {
-            NodePtr::null()
-        } else {
-            let mut temp = self.root;
-            while !temp.left().is_null() {
-                temp = temp.left();
-            }
-            temp
-        }
-    }
-
-    fn last_child(&self) -> NodePtr<T> {
-        if self.root.is_null() {
-            NodePtr::null()
-        } else {
-            let mut temp = self.root;
-            while !temp.right().is_null() {
-                temp = temp.right();
-            }
-            temp
-        }
-    }
-
-    pub fn get_first(&self) -> Option<(&Name, &T)> {
-        let first = self.first_child();
-        if first.is_null() {
-            return None;
-        }
-        unsafe { Some((&(*first.0).name, &(*first.0).value)) }
-    }
-
-    pub fn get_last(&self) -> Option<(&Name, &T)> {
-        let last = self.last_child();
-        if last.is_null() {
-            return None;
-        }
-        unsafe { Some((&(*last.0).name, &(*last.0).value)) }
-    }
-
-    pub fn pop_first(&mut self) -> Option<(Name, T)> {
-        let first = self.first_child();
-        if first.is_null() {
-            return None;
-        }
-        unsafe { Some(self.delete(first)) }
-    }
-
-    pub fn pop_last(&mut self) -> Option<(Name, T)> {
-        let last = self.last_child();
-        if last.is_null() {
-            return None;
-        }
-        unsafe { Some(self.delete(last)) }
-    }
-
-    pub fn get_first_mut(&mut self) -> Option<(&Name, &mut T)> {
-        let first = self.first_child();
-        if first.is_null() {
-            return None;
-        }
-        unsafe { Some((&(*first.0).name, &mut (*first.0).value)) }
-    }
-
-    pub fn get_last_mut(&mut self) -> Option<(&Name, &mut T)> {
-        let last = self.last_child();
-        if last.is_null() {
-            return None;
-        }
-        unsafe { Some((&(*last.0).name, &mut (*last.0).value)) }
-    }
-
-    pub fn get(&self, k: &Name) -> Option<&T> {
-        let node = self.find_node(k);
-        if node.is_null() {
-            return None;
-        }
-
-        unsafe { Some(&(*node.0).value) }
-    }
-
-    pub fn get_mut(&mut self, k: &Name) -> Option<&mut T> {
-        let node = self.find_node(k);
-        if node.is_null() {
-            return None;
-        }
-
-        unsafe { Some(&mut (*node.0).value) }
-    }
-
-    pub fn contains_key(&self, k: &Name) -> bool {
-        let node = self.find_node(k);
-        if node.is_null() {
-            return false;
-        }
-        true
+        result
     }
 
     fn clear_recurse(&mut self, current: NodePtr<T>) {
@@ -638,6 +317,7 @@ impl<T> RBTree<T> {
             unsafe {
                 self.clear_recurse(current.left());
                 self.clear_recurse(current.right());
+                self.clear_recurse(current.down());
                 Box::from_raw(current.0);
             }
         }
@@ -648,166 +328,62 @@ impl<T> RBTree<T> {
         self.root = NodePtr::null();
         self.clear_recurse(root);
     }
+}
 
-    fn fast_clear(&mut self) {
-        self.root = NodePtr::null();
-    }
-
-    pub fn remove(&mut self, k: &Name) -> Option<T> {
-        let node = self.find_node(k);
-        if node.is_null() {
-            return None;
-        }
-        unsafe { Some(self.delete(node).1) }
-    }
-
-    unsafe fn delete_fixup(&mut self, mut node: NodePtr<T>, mut parent: NodePtr<T>) {
-        while node != self.root && node.is_black() {
-            let mut sibling = NodePtr::sibling(parent, node);
-            let is_right_sibling = parent.left() == node;
-            if sibling.is_red() {
-                sibling.set_color(Color::Black);
-                parent.set_color(Color::Red);
-                if is_right_sibling {
-                    self.left_rotate(parent);
-                    sibling = parent.right();
-                } else {
-                    self.right_rotate(parent);
-                    sibling = parent.left();
-                }
-            }
-
-            let mut sibleft = sibling.left();
-            let mut sibright = sibling.right();
-            if sibleft.is_black() && sibright.is_black() {
-                sibling.set_color(Color::Red);
-                node = parent;
-                parent = node.parent();
-            } else {
-                if is_right_sibling {
-                    if sibright.is_black() {
-                        sibleft.set_color(Color::Black);
-                        sibling.set_color(Color::Red);
-                        self.right_rotate(sibling);
-                        sibling = parent.right();
-                    }
-                } else if sibleft.is_black() {
-                    sibright.set_color(Color::Black);
-                    sibling.set_color(Color::Red);
-                    self.left_rotate(sibling);
-                    sibling = parent.left();
-                }
-                sibling.set_color(parent.get_color());
-                parent.set_color(Color::Black);
-                if is_right_sibling {
-                    sibling.right().set_color(Color::Black);
-                    self.left_rotate(parent);
-                } else {
-                    sibling.left().set_color(Color::Black);
-                    self.right_rotate(parent);
-                }
-                node = self.root;
-                break;
-            }
-        }
-        node.set_color(Color::Black)
-    }
-
-    unsafe fn delete(&mut self, node: NodePtr<T>) -> (Name, T) {
-        let mut child;
-        let mut parent;
-        let color;
-
-        self.len -= 1;
-        if !node.left().is_null() && !node.right().is_null() {
-            let mut replace = node.next();
-            if node.parent().is_null() {
-                self.root = replace;
-            } else if node.parent().left() == node {
-                node.parent().set_left(replace);
-            } else {
-                node.parent().set_right(replace);
-            }
-
-            child = replace.right();
-            parent = replace.parent();
-            color = replace.get_color();
-            if parent == node {
-                parent = replace;
-            } else {
-                if !child.is_null() {
-                    child.set_parent(parent);
-                }
-                parent.set_left(child);
-                replace.set_right(node.right());
-                node.right().set_parent(replace);
-            }
-
-            replace.set_parent(node.parent());
-            replace.set_color(node.get_color());
-            replace.set_left(node.left());
-            node.left().set_parent(replace);
-
-            if color == Color::Black {
-                self.delete_fixup(child, parent);
-            }
-
-            return Box::from_raw(node.0).pair();
-        }
-
-        if !node.left().is_null() {
-            child = node.left();
+unsafe fn connect_child<T>(
+    root: *mut *mut RBTreeNode<T>,
+    current: NodePtr<T>,
+    old: NodePtr<T>,
+    new: NodePtr<T>,
+) {
+    let mut parent = current.parent();
+    if parent.is_null() {
+        *root = new.get_pointer();
+    } else {
+        if parent.left() == old {
+            parent.set_left(new)
+        } else if parent.right() == old {
+            parent.set_right(new);
         } else {
-            child = node.right();
-        }
-        if !child.is_null() {
-            child.set_parent(node.parent());
-        }
-
-        if node.parent().is_null() {
-            self.root = child
-        } else if node.parent().left() == node {
-            node.parent().set_left(child);
-        } else {
-            node.parent().set_right(child);
-        }
-
-        if node.is_black() {
-            self.delete_fixup(child, node.parent());
-        }
-
-        Box::from_raw(node.0).pair()
-    }
-
-    pub fn keys(&self) -> Keys<T> {
-        Keys { inner: self.iter() }
-    }
-
-    pub fn values(&self) -> Values<T> {
-        Values { inner: self.iter() }
-    }
-
-    pub fn values_mut(&mut self) -> ValuesMut<T> {
-        ValuesMut {
-            inner: self.iter_mut(),
+            parent.set_down(new);
         }
     }
+}
 
-    pub fn iter(&self) -> Iter<T> {
-        Iter {
-            head: self.first_child(),
-            tail: self.last_child(),
-            len: self.len,
-            _marker: marker::PhantomData,
+mod tests {
+    use super::{FindResultFlag, RBTree};
+    use crate::domaintree::test_helper::name_from_string;
+    use r53::Name;
+
+    fn build_tree() -> RBTree<i32> {
+        let names = vec![
+            "c",
+            "b",
+            "a",
+            "x.d.e.f",
+            "z.d.e.f",
+            "g.h",
+            "i.g.h",
+            "o.w.y.d.e.f",
+            "j.z.d.e.f",
+            "p.w.y.d.e.f",
+            "q.w.y.d.e.f",
+        ];
+        let mut tree = RBTree::new();
+        let mut value = 0;
+        for k in &names {
+            tree.insert(name_from_string(k), value);
+            value += 1;
         }
+        tree
     }
 
-    pub fn iter_mut(&mut self) -> IterMut<T> {
-        IterMut {
-            head: self.first_child(),
-            tail: self.last_child(),
-            len: self.len,
-            _marker: marker::PhantomData,
-        }
+    #[test]
+    fn test_find() {
+        let tree = build_tree();
+        assert_eq!(tree.len(), 13);
+        let result = tree.find_node(&name_from_string("c"));
+        assert_eq!(result.flag, FindResultFlag::ExacatMatch);
+        assert_eq!(result.node.get_value(), &Some(0));
     }
 }
