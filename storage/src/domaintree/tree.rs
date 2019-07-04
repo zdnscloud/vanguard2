@@ -358,20 +358,10 @@ impl<T> RBTree<T> {
 
             self.len -= 1;
 
-            if up.is_null() || up.get_value().is_some() {
+            if up.is_null() || up.get_value().is_some() || !up.down().is_null() {
                 break;
             }
 
-            if !up.down().is_null() {
-                println!(
-                    "up {} has down {}, so stop here",
-                    up.get_name().to_string(),
-                    up.down().get_name().to_string()
-                );
-                break;
-            }
-
-            println!("move to up {} ", up.get_name().to_string());
             node = up;
         }
         old_value
