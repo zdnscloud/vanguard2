@@ -428,6 +428,7 @@ impl<K: Ord, V> RBTree<K, V> {
     }
 
     unsafe fn left_rotate(&mut self, mut node: NodePtr<K, V>) {
+        println!("---> rbtree left rotate");
         let mut right = node.right();
         let mut rleft = right.left();
         node.set_right(rleft);
@@ -448,6 +449,7 @@ impl<K: Ord, V> RBTree<K, V> {
     }
 
     unsafe fn right_rotate(&mut self, mut node: NodePtr<K, V>) {
+        println!("---> rbtree right rotate");
         let mut left = node.left();
         let mut lright = left.right();
         node.set_left(lright);
@@ -866,6 +868,7 @@ impl<K: Ord, V> RBTree<K, V> {
 mod tests {
     use super::RBTree;
 
+    /*
     #[test]
     fn test_insert() {
         let mut m = RBTree::new();
@@ -1244,5 +1247,18 @@ mod tests {
         assert_eq!(a[&1], "one");
         assert_eq!(a[&2], "two");
         assert_eq!(a[&3], "three");
+    }
+    */
+
+    #[test]
+    fn test_tree_print() {
+        let mut a = RBTree::new();
+        a.insert("a", 1);
+        a.insert("b", 2);
+        a.insert("c", 3);
+        a.print_tree();
+
+        a.remove(&"a");
+        a.print_tree();
     }
 }

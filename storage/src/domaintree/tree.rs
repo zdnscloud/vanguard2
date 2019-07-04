@@ -7,7 +7,9 @@ use std::marker;
 use std::mem;
 use std::ops::Index;
 
-use crate::domaintree::node::{Color, NodePtr, RBTreeNode, COLOR_MASK, SUBTREE_ROOT_MASK};
+use crate::domaintree::node::{
+    connect_child, get_sibling, Color, NodePtr, RBTreeNode, COLOR_MASK, SUBTREE_ROOT_MASK,
+};
 use crate::domaintree::node_chain::NodeChain;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -51,6 +53,11 @@ impl<T: Clone> Clone for RBTree<T> {
             new
         }
     }
+}
+
+fn indent(depth: usize) {
+    const INDENT_FOR_EACH_DEPTH: usize = 5;
+    print!("{}", " ".repeat((depth * INDENT_FOR_EACH_DEPTH) as usize));
 }
 
 impl<T> RBTree<T> {
@@ -155,7 +162,7 @@ impl<T> RBTree<T> {
                 break;
             }
         }
-        (**root).flag.set_flag(COLOR_MASK);
+        (**root).flag.clear_flag(COLOR_MASK);
     }
 
     pub fn insert(&mut self, target_: Name, v: T) -> Option<Option<T>> {
@@ -165,7 +172,6 @@ impl<T> RBTree<T> {
         let mut order = -1;
         let mut target = target_;
 
-        println!("insert {}", target);
         while !current.is_null() {
             let compare_result = target.get_relation(current.get_name());
             match compare_result.relation {
@@ -173,7 +179,6 @@ impl<T> RBTree<T> {
                     return Some(mem::replace(&mut (*current.0).value, Some(v)));
                 },
                 NameRelation::None => {
-                    println!("into same tree");
                     parent = current;
                     order = compare_result.order;
                     current = if order < 0 {
@@ -183,7 +188,6 @@ impl<T> RBTree<T> {
                     };
                 }
                 NameRelation::SubDomain => {
-                    println!("into sub domain");
                     parent = NodePtr::null();
                     up = current;
                     target = target.strip_right((compare_result.common_label_count - 1) as usize);
@@ -196,11 +200,6 @@ impl<T> RBTree<T> {
                     let new_name = current
                         .get_name()
                         .strip_right((compare_result.common_label_count - 1) as usize);
-                    println!(
-                        "common {}, new {}",
-                        common_ancestor.to_string(),
-                        new_name.to_string()
-                    );
                     unsafe {
                         self.node_fission(&mut current, new_name, common_ancestor);
                     }
@@ -241,12 +240,6 @@ impl<T> RBTree<T> {
     }
 
     unsafe fn node_fission(&mut self, node: &mut NodePtr<T>, new_prefix: Name, new_suffix: Name) {
-        println!(
-            "do fission with old name: {}, new name {}, common {}",
-            node.get_name(),
-            new_prefix,
-            new_suffix
-        );
         let mut up = NodePtr::new(new_suffix, None);
         node.set_name(new_prefix);
         up.set_parent(node.parent());
@@ -311,6 +304,145 @@ impl<T> RBTree<T> {
         result
     }
 
+    pub fn remove_node(&mut self, mut node: NodePtr<T>) -> Option<T> {
+        let old_value = node.set_value(None);
+
+        if !node.down().is_null() {
+            return old_value;
+        }
+
+        loop {
+            let mut up = node.get_upper_node();
+            if !node.left().is_null() && !node.right().is_null() {
+                let mut right_most = node.left();
+                while !right_most.right().is_null() {
+                    right_most = right_most.right();
+                }
+                unsafe {
+                    node.exchange(right_most, self.root.get_double_pointer());
+                }
+            }
+
+            let mut child = NodePtr::null();
+            if !node.right().is_null() {
+                child = node.right();
+            } else {
+                child = node.left();
+            }
+
+            unsafe {
+                connect_child(self.root.get_double_pointer(), node, node, child);
+            }
+
+            if !child.is_null() {
+                child.set_parent(node.parent());
+                if child.parent().is_null() || child.parent().down() == child {
+                    child.use_flag(node.is_flag_set(SUBTREE_ROOT_MASK), SUBTREE_ROOT_MASK);
+                }
+            }
+
+            if node.is_black() {
+                if !child.is_null() && child.is_red() {
+                    child.set_color(Color::Black);
+                } else {
+                    let current_root = if !up.is_null() {
+                        up.get_double_pointer_of_down()
+                    } else {
+                        self.root.get_double_pointer()
+                    };
+                    unsafe {
+                        self.remove_fixup(current_root, child, node.parent());
+                    }
+                }
+            }
+
+            self.len -= 1;
+
+            if up.is_null() || up.get_value().is_some() {
+                break;
+            }
+
+            if !up.down().is_null() {
+                println!(
+                    "up {} has down {}, so stop here",
+                    up.get_name().to_string(),
+                    up.down().get_name().to_string()
+                );
+                break;
+            }
+
+            println!("move to up {} ", up.get_name().to_string());
+            node = up;
+        }
+        old_value
+    }
+
+    unsafe fn remove_fixup(
+        &mut self,
+        root: *mut *mut RBTreeNode<T>,
+        mut child: NodePtr<T>,
+        mut parent: NodePtr<T>,
+    ) {
+        while child.get_pointer() != *root && child.is_black() {
+            if !parent.is_null() && parent.down().get_pointer() == *root {
+                break;
+            }
+
+            let mut sibling = get_sibling(parent, child);
+            if sibling.is_red() {
+                parent.set_color(Color::Red);
+                sibling.set_color(Color::Black);
+                if parent.left() == child {
+                    self.left_rotate(root, parent);
+                } else {
+                    self.right_rotate(root, parent);
+                }
+                sibling = get_sibling(parent, child);
+            }
+            if sibling.left().is_black() && sibling.right().is_black() {
+                sibling.set_color(Color::Red);
+                if parent.is_black() {
+                    child = parent;
+                    parent = parent.parent();
+                    continue;
+                } else {
+                    parent.set_color(Color::Black);
+                    break;
+                }
+            }
+            let mut ss1 = sibling.left();
+            let mut ss2 = sibling.right();
+            if parent.left() != child {
+                mem::swap(&mut ss1, &mut ss2);
+            }
+            if ss2.is_black() {
+                sibling.set_color(Color::Red);
+                ss1.set_color(Color::Black);
+                if parent.left() == child {
+                    self.right_rotate(root, sibling);
+                } else {
+                    self.left_rotate(root, sibling);
+                }
+                sibling = get_sibling(parent, child);
+            }
+
+            sibling.set_color(parent.get_color());
+            parent.set_color(Color::Black);
+            ss1 = sibling.left();
+            ss2 = sibling.right();
+            if parent.left() != child {
+                mem::swap(&mut ss1, &mut ss2);
+            }
+            ss2.set_color(Color::Black);
+            if parent.left() == child {
+                self.left_rotate(root, parent);
+            } else {
+                self.right_rotate(root, parent);
+            }
+            break;
+        }
+    }
+
     fn clear_recurse(&mut self, current: NodePtr<T>) {
         if !current.is_null() {
             unsafe {
@@ -327,25 +459,49 @@ impl<T> RBTree<T> {
         self.root = NodePtr::null();
         self.clear_recurse(root);
     }
-}
 
-unsafe fn connect_child<T>(
-    root: *mut *mut RBTreeNode<T>,
-    current: NodePtr<T>,
-    old: NodePtr<T>,
-    new: NodePtr<T>,
-) {
-    let mut parent = current.parent();
-    if parent.is_null() {
-        *root = new.get_pointer();
-    } else {
-        if parent.left() == old {
-            parent.set_left(new)
-        } else if parent.right() == old {
-            parent.set_right(new);
-        } else {
-            parent.set_down(new);
+    pub fn dump(&self, depth: usize) {
+        indent(depth);
+        println!("tree has {} node(s)", self.len);
+        self.dump_helper(self.root, depth);
+    }
+
+    fn dump_helper(&self, node: NodePtr<T>, depth: usize) {
+        if node.is_null() {
+            indent(depth);
+            println!("NULL");
+            return;
         }
+        indent(depth);
+
+        let parent = node.parent();
+        if !parent.is_null() {
+            if parent.left() == node {
+                print!("left>");
+            } else {
+                print!("right>");
+            }
+        }
+
+        print!("{} ({:?})", node.get_name().to_string(), node.get_color());
+        if node.get_value().is_none() {
+            print!("[invisible]");
+        }
+        if node.is_flag_set(SUBTREE_ROOT_MASK) {
+            print!(" [subtreeroot]");
+        }
+        print!("\n");
+
+        let down = node.down();
+        if !down.is_null() {
+            indent(depth + 1);
+            println!("begin down from {}\n", down.get_name().to_string());
+            self.dump_helper(down, depth + 1);
+            indent(depth + 1);
+            println!("end down from {}", down.get_name().to_string());
+        }
+        self.dump_helper(node.left(), depth + 1);
+        self.dump_helper(node.right(), depth + 1);
     }
 }
 
@@ -354,7 +510,7 @@ mod tests {
     use crate::domaintree::test_helper::name_from_string;
     use r53::Name;
 
-    fn sample_names() -> Vec<(String, i32)> {
+    fn sample_names() -> Vec<(&'static str, i32)> {
         vec![
             "c",
             "b",
@@ -370,27 +526,26 @@ mod tests {
         ]
         .iter()
         .zip(0..)
-        .map(|(s, i)| (s.to_string(), i))
+        .map(|(&s, v)| (s, v))
         .collect()
     }
 
-    fn build_tree() -> RBTree<i32> {
-        let names = sample_names();
+    fn build_tree(data: &Vec<(&'static str, i32)>) -> RBTree<i32> {
         let mut tree = RBTree::new();
-        for (k, v) in names {
-            tree.insert(name_from_string(k.as_ref()), v);
+        for (k, v) in data {
+            tree.insert(name_from_string(k), *v);
         }
         tree
     }
 
     #[test]
     fn test_find() {
-        let tree = build_tree();
+        let data = sample_names();
+        let tree = build_tree(&data);
         assert_eq!(tree.len(), 13);
 
         for (n, v) in sample_names() {
-            let result = tree.find_node(&name_from_string(n.as_ref()));
-            println!("---> find name {}", n);
+            let result = tree.find_node(&name_from_string(n));
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             assert_eq!(result.node.get_value(), &Some(v));
         }
@@ -401,5 +556,18 @@ mod tests {
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             assert_eq!(result.node.get_value(), &None);
         }
+    }
+
+    #[test]
+    fn test_delete() {
+        let data = sample_names();
+        let mut tree = build_tree(&data);
+        assert_eq!(tree.len(), 13);
+        for (n, v) in data {
+            let mut result = tree.find_node(&name_from_string(n));
+            assert_eq!(result.flag, FindResultFlag::ExacatMatch);
+            assert_eq!(tree.remove_node(result.node), Some(v));
+        }
+        assert_eq!(tree.len(), 0);
     }
 }

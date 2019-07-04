@@ -113,10 +113,10 @@ impl<T> NodePtr<T> {
         NodePtr(Box::into_raw(Box::new(node)))
     }
 
-    pub fn set_color(&mut self, color: Color) {
+    pub fn set_color(self, color: Color) {
         match color {
-            Color::Black => self.set_flag(COLOR_MASK),
-            Color::Red => self.clear_flag(COLOR_MASK),
+            Color::Black => self.clear_flag(COLOR_MASK),
+            Color::Red => self.set_flag(COLOR_MASK),
         }
     }
 
@@ -126,13 +126,13 @@ impl<T> NodePtr<T> {
         }
 
         if self.is_flag_set(COLOR_MASK) {
-            Color::Black
-        } else {
             Color::Red
+        } else {
+            Color::Black
         }
     }
 
-    pub fn set_flag(&mut self, mask: u16) {
+    pub fn set_flag(self, mask: u16) {
         if self.is_null() {
             return;
         }
@@ -141,7 +141,7 @@ impl<T> NodePtr<T> {
         }
     }
 
-    pub fn clear_flag(&mut self, mask: u16) {
+    pub fn clear_flag(self, mask: u16) {
         if self.is_null() {
             return;
         }
@@ -152,6 +152,14 @@ impl<T> NodePtr<T> {
 
     pub fn is_flag_set(self, mask: u16) -> bool {
         unsafe { (*self.0).flag.is_flag_set(mask) }
+    }
+
+    pub fn use_flag(self, enable: bool, mask: u16) {
+        if enable {
+            self.set_flag(mask);
+        } else {
+            self.clear_flag(mask);
+        }
     }
 
     pub fn get_name(&self) -> &Name {
@@ -277,16 +285,6 @@ impl<T> NodePtr<T> {
         }
     }
 
-    pub fn sibling(parent: NodePtr<T>, child: NodePtr<T>) -> NodePtr<T> {
-        if parent.is_null() {
-            NodePtr::null()
-        } else if parent.left() == child {
-            parent.right()
-        } else {
-            parent.left()
-        }
-    }
-
     pub fn uncle(self) -> NodePtr<T> {
         let grand_parent = self.grand_parent();
         if grand_parent.is_null() {
@@ -339,6 +337,38 @@ impl<T> NodePtr<T> {
     pub fn get_double_pointer_of_down(&mut self) -> *mut *mut RBTreeNode<T> {
         unsafe { &mut (*self.0).down.0 }
     }
+
+    pub unsafe fn exchange(&mut self, lower: NodePtr<T>, root: *mut *mut RBTreeNode<T>) {
+        swap(&mut (*self.0).left, &mut (*lower.0).left);
+        if lower.left() == lower {
+            lower.set_left(*self);
+        }
+
+        swap(&mut (*self.0).right, &mut (*lower.0).right);
+        if lower.right() == lower {
+            lower.set_right(*self);
+        }
+
+        swap(&mut (*self.0).parent, &mut (*lower.0).parent);
+        if self.parent() == *self {
+            self.set_parent(lower);
+        }
+
+        swap(&mut (*self.0).flag, &mut (*lower.0).flag);
+
+        connect_child(root, lower, *self, lower);
+        if self.parent().left() == lower {
+            self.parent().set_left(*self);
+        } else if self.parent().right() == lower {
+            self.parent().set_right(*self);
+        }
+        if !lower.right().is_null() {
+            lower.right().set_parent(lower);
+        }
+        if !lower.left().is_null() {
+            lower.left().set_parent(lower);
+        }
+    }
 }
 
 impl<T: Clone> NodePtr<T> {
@@ -356,8 +386,38 @@ impl<T: Clone> NodePtr<T> {
     }
 }
 
+pub fn get_sibling<T>(parent: NodePtr<T>, child: NodePtr<T>) -> NodePtr<T> {
+    if parent.is_null() {
+        NodePtr::null()
+    } else if parent.left() == child {
+        parent.right()
+    } else {
+        parent.left()
+    }
+}
+
+pub unsafe fn connect_child<T>(
+    root: *mut *mut RBTreeNode<T>,
+    current: NodePtr<T>,
+    old: NodePtr<T>,
+    new: NodePtr<T>,
+) {
+    let mut parent = current.parent();
+    if parent.is_null() {
+        *root = new.get_pointer();
+    } else {
+        if parent.left() == old {
+            parent.set_left(new)
+        } else if parent.right() == old {
+            parent.set_right(new);
+        } else {
+            parent.set_down(new);
+        }
+    }
+}
+
 mod tests {
-    use super::NodePtr;
+    use super::{NodePtr, SUBTREE_ROOT_MASK};
     use crate::domaintree::test_helper::name_from_string;
     use r53::Name;
 
@@ -394,4 +454,14 @@ mod tests {
         assert_eq!(n1.down().get_value(), &Some("v2"));
     }
 
+    #[test]
+    fn test_flag() {
+        let name1 = name_from_string("k1");
+        let mut n1 = NodePtr::new(name1.clone(), Some("v1"));
+        n1.set_flag(SUBTREE_ROOT_MASK);
+        n1.use_flag(false, SUBTREE_ROOT_MASK);
+        assert!(n1.is_flag_set(SUBTREE_ROOT_MASK) == false);
+        n1.use_flag(true, SUBTREE_ROOT_MASK);
+        assert!(n1.is_flag_set(SUBTREE_ROOT_MASK));
+    }
 }
