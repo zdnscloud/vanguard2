@@ -177,15 +177,7 @@ impl<T> RBTree<T> {
                 NameRelation::Equal => unsafe {
                     return Some(mem::replace(&mut (*current.0).value, Some(v)));
                 },
-                NameRelation::None => {
-                    parent = current;
-                    order = compare_result.order;
-                    current = if order < 0 {
-                        current.left()
-                    } else {
-                        current.right()
-                    };
-                }
+                NameRelation::None => panic!("name always has relationship"),
                 NameRelation::SubDomain => {
                     parent = NodePtr::null();
                     up = current;
@@ -193,16 +185,26 @@ impl<T> RBTree<T> {
                     current = current.down();
                 }
                 _ => {
-                    let common_ancestor = target.strip_left(
-                        (target.label_count - compare_result.common_label_count) as usize,
-                    );
-                    let new_name = current
-                        .get_name()
-                        .strip_right((compare_result.common_label_count - 1) as usize);
-                    unsafe {
-                        self.node_fission(&mut current, new_name, common_ancestor);
+                    if compare_result.common_label_count == 1 {
+                        parent = current;
+                        order = compare_result.order;
+                        current = if order < 0 {
+                            current.left()
+                        } else {
+                            current.right()
+                        };
+                    } else {
+                        let common_ancestor = target.strip_left(
+                            (target.label_count - compare_result.common_label_count) as usize,
+                        );
+                        let new_name = current
+                            .get_name()
+                            .strip_right((compare_result.common_label_count - 1) as usize);
+                        unsafe {
+                            self.node_fission(&mut current, new_name, common_ancestor);
+                        }
+                        current = current.parent();
                     }
-                    current = current.parent();
                 }
             }
         }
@@ -277,7 +279,9 @@ impl<T> RBTree<T> {
                     result.node = node;
                     break;
                 }
-                NameRelation::None => {
+                NameRelation::CommonAncestor
+                    if chain.last_compared_result.common_label_count == 1 =>
+                {
                     if chain.last_compared_result.order < 0 {
                         node = node.left();
                     } else {
@@ -528,6 +532,7 @@ mod tests {
         let data = sample_names();
         let tree = build_tree(&data);
         assert_eq!(tree.len(), 13);
+        tree.dump(4);
 
         for (n, v) in sample_names() {
             let result = tree.find_node(&name_from_string(n));
