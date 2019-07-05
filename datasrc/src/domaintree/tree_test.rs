@@ -2,7 +2,6 @@ use crate::domaintree::tree::{FindResultFlag, RBTree};
 use proptest::{collection::vec, prelude::*};
 use r53::Name;
 use std::collections::HashSet;
-use std::fmt::Debug;
 
 prop_compose! {
     fn arb_name()(
@@ -16,7 +15,7 @@ prop_compose! {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(50))]
+    #![proptest_config(ProptestConfig::with_cases(10))]
     #[test]
     fn test_insert_delete_batch(
         names in vec(arb_name(), 100..1000)

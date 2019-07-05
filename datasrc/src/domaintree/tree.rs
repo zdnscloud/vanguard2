@@ -1,11 +1,5 @@
 use r53::{Name, NameRelation};
-use std::cmp::Ord;
-use std::cmp::Ordering;
-use std::fmt::{self, Debug};
-use std::iter::{FromIterator, IntoIterator};
-use std::marker;
 use std::mem;
-use std::ops::Index;
 
 use crate::domaintree::flag::Color;
 use crate::domaintree::node::{connect_child, get_sibling, NodePtr, RBTreeNode};
@@ -35,6 +29,12 @@ impl<T> FindResult<T> {
 pub struct RBTree<T> {
     root: NodePtr<T>,
     len: usize,
+}
+
+impl<T> Default for RBTree<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T> Drop for RBTree<T> {
@@ -75,7 +75,7 @@ impl<T> RBTree<T> {
         self.root.is_null()
     }
 
-    unsafe fn left_rotate(&mut self, root: *mut *mut RBTreeNode<T>, mut node: NodePtr<T>) {
+    unsafe fn left_rotate(&mut self, root: *mut *mut RBTreeNode<T>, node: NodePtr<T>) {
         let right = node.right();
         let rleft = right.left();
         node.set_right(rleft);
@@ -101,7 +101,7 @@ impl<T> RBTree<T> {
         node.set_subtree_root(false);
     }
 
-    unsafe fn right_rotate(&mut self, root: *mut *mut RBTreeNode<T>, mut node: NodePtr<T>) {
+    unsafe fn right_rotate(&mut self, root: *mut *mut RBTreeNode<T>, node: NodePtr<T>) {
         let left = node.left();
         let lright = left.right();
         node.set_left(lright);
@@ -322,12 +322,11 @@ impl<T> RBTree<T> {
                 }
             }
 
-            let mut child = NodePtr::null();
-            if !node.right().is_null() {
-                child = node.right();
+            let child = if !node.right().is_null() {
+                node.right()
             } else {
-                child = node.left();
-            }
+                node.left()
+            };
 
             unsafe {
                 connect_child(self.root.get_double_pointer(), node, node, child);
@@ -479,7 +478,7 @@ impl<T> RBTree<T> {
         if node.is_subtree_root() {
             print!(" [subtreeroot]");
         }
-        print!("\n");
+        println!();
 
         let down = node.down();
         if !down.is_null() {
@@ -494,10 +493,10 @@ impl<T> RBTree<T> {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::{FindResultFlag, RBTree};
     use crate::domaintree::test_helper::name_from_string;
-    use r53::Name;
 
     fn sample_names() -> Vec<(&'static str, i32)> {
         vec![

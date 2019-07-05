@@ -82,6 +82,7 @@ impl NodeFlag {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
 

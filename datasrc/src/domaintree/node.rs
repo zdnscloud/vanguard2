@@ -72,7 +72,7 @@ impl<T> NodePtr<T> {
             right: NodePtr::null(),
             parent: NodePtr::null(),
             down: NodePtr::null(),
-            name: name,
+            name,
             value: v,
         };
         NodePtr(Box::into_raw(Box::new(node)))
@@ -272,7 +272,7 @@ impl<T> NodePtr<T> {
 
 impl<T: Clone> NodePtr<T> {
     pub unsafe fn deep_clone(self) -> NodePtr<T> {
-        let mut node = NodePtr::new((*self.0).name.clone(), (*self.0).value.clone());
+        let node = NodePtr::new((*self.0).name.clone(), (*self.0).value.clone());
         if !self.left().is_null() {
             node.set_left(self.left().deep_clone());
             node.left().set_parent(node);
@@ -301,20 +301,19 @@ pub unsafe fn connect_child<T>(
     old: NodePtr<T>,
     new: NodePtr<T>,
 ) {
-    let mut parent = current.parent();
+    let parent = current.parent();
     if parent.is_null() {
         *root = new.get_pointer();
+    } else if parent.left() == old {
+        parent.set_left(new)
+    } else if parent.right() == old {
+        parent.set_right(new);
     } else {
-        if parent.left() == old {
-            parent.set_left(new)
-        } else if parent.right() == old {
-            parent.set_right(new);
-        } else {
-            parent.set_down(new);
-        }
+        parent.set_down(new);
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::NodePtr;
     use crate::domaintree::test_helper::name_from_string;
@@ -336,11 +335,9 @@ mod tests {
 
     #[test]
     fn test_double_pointer() {
-        let name1 = name_from_string("k1");
-        let name2 = name_from_string("k1");
-        let name3 = name_from_string("k1");
-        let mut n1 = NodePtr::new(name1.clone(), Some("v1"));
-        let n2 = NodePtr::new(name1.clone(), Some("v2"));
+        let name = name_from_string("k1");
+        let mut n1 = NodePtr::new(name.clone(), Some("v1"));
+        let n2 = NodePtr::new(name.clone(), Some("v2"));
 
         assert!(n1.is_red());
         assert_eq!(n1.get_value(), &Some("v1"));
