@@ -8,7 +8,6 @@ prop_compose! {
     fn arb_name()(
         mut labels in vec("[a-z0-9]{1,63}", 1..128).prop_map(|v| v.join(".")),
         ) -> Name{
-        println!("lables {}", labels);
         if labels.len() >= 254 {
             labels.truncate(253);
         }

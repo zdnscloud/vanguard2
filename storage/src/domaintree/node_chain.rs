@@ -1,9 +1,9 @@
 use crate::domaintree::node::{NodePtr, RBTreeNode};
-use r53::{name::NameComparisonResult, Name, NameRelation};
+use r53::{name::NameComparisonResult, name::MAX_LABEL_COUNT, Name, NameRelation};
 
 pub struct NodeChain<T> {
     pub level_count: usize,
-    pub nodes: [NodePtr<T>; 256],
+    pub nodes: [NodePtr<T>; MAX_LABEL_COUNT as usize],
     pub last_compared: NodePtr<T>,
     pub last_compared_result: NameComparisonResult,
 }
@@ -12,7 +12,7 @@ impl<T> NodeChain<T> {
     pub fn new() -> Self {
         NodeChain {
             level_count: 0,
-            nodes: [NodePtr::null(); 256],
+            nodes: [NodePtr::null(); MAX_LABEL_COUNT as usize],
             last_compared: NodePtr::null(),
             last_compared_result: NameComparisonResult {
                 order: 0,
