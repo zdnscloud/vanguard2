@@ -16,6 +16,7 @@ prop_compose! {
 
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(10))]
+    #[ignore]
     #[test]
     fn test_insert_delete_batch(
         names in vec(arb_name(), 100..1000)
