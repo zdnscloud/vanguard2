@@ -559,4 +559,32 @@ mod tests {
         }
         assert_eq!(tree.len(), 0);
     }
+
+    use std::cell::Cell;
+    use std::rc::Rc;
+    pub struct NumberWrapper(Rc<Cell<i32>>);
+    impl NumberWrapper {
+        fn new(c: Rc<Cell<i32>>) -> Self {
+            c.set(c.get() + 1);
+            NumberWrapper(c)
+        }
+    }
+
+    impl Drop for NumberWrapper {
+        fn drop(&mut self) {
+            self.0.set(self.0.get() - 1);
+        }
+    }
+    #[test]
+    fn test_clean() {
+        let num = Rc::new(Cell::new(0));
+        {
+            let mut tree = RBTree::new();
+            for name in vec!["a", "b", "c", "d"] {
+                tree.insert(name_from_string(name), NumberWrapper::new(num.clone()));
+            }
+            assert_eq!(num.get(), 4);
+        }
+        assert_eq!(num.get(), 0);
+    }
 }
