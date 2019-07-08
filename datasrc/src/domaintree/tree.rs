@@ -164,7 +164,7 @@ impl<T> RBTree<T> {
         (**root).flag.set_color(Color::Black);
     }
 
-    pub fn insert(&mut self, target_: Name, v: T) -> Option<Option<T>> {
+    pub fn insert(&mut self, target_: Name, v: T) -> (NodePtr<T>, Option<Option<T>>) {
         let mut parent = NodePtr::null();
         let mut up = NodePtr::null();
         let mut current = self.root;
@@ -175,7 +175,10 @@ impl<T> RBTree<T> {
             let compare_result = target.get_relation(current.get_name());
             match compare_result.relation {
                 NameRelation::Equal => unsafe {
-                    return Some(mem::replace(&mut (*current.0).value, Some(v)));
+                    return (
+                        current,
+                        Some(mem::replace(&mut (*current.0).value, Some(v))),
+                    );
                 },
                 NameRelation::None => panic!("name always has relationship"),
                 NameRelation::SubDomain => {
@@ -237,7 +240,7 @@ impl<T> RBTree<T> {
                 self.insert_fixup(current_root, node);
             }
         }
-        None
+        (node, None)
     }
 
     unsafe fn node_fission(&mut self, node: &mut NodePtr<T>, new_prefix: Name, new_suffix: Name) {
@@ -264,9 +267,24 @@ impl<T> RBTree<T> {
         self.len += 1;
     }
 
-    pub fn find_node(&self, target_: &Name) -> FindResult<T> {
+    pub fn find_node(&self, target_: &Name, chain: &mut NodeChain<T>) -> FindResult<T> {
+        self.find_node_ext(
+            target_,
+            chain,
+            &mut None::<fn(_, &mut Option<usize>) -> bool>,
+            &mut None,
+        )
+    }
+
+    pub fn find_node_ext<P, F: FnMut(NodePtr<T>, &mut P) -> bool>(
+        &self,
+        target_: &Name,
+        chain: &mut NodeChain<T>,
+        callback: &mut Option<F>,
+        param: &mut P,
+    ) -> FindResult<T> {
         let mut node = self.root;
-        let mut chain = NodeChain::new();
+        //let mut chain = NodeChain::new();
         let mut result = FindResult::new();
         let mut target = target_.clone();
         while !node.is_null() {
@@ -290,6 +308,11 @@ impl<T> RBTree<T> {
                 }
                 NameRelation::SubDomain => {
                     result.flag = FindResultFlag::PartialMatch;
+                    if node.is_callback_enabled() && callback.is_some() {
+                        if callback.as_mut().unwrap()(node, param) {
+                            break;
+                        }
+                    }
                     chain.push(node);
                     target = target
                         .strip_right((chain.last_compared_result.common_label_count - 1) as usize);
@@ -495,7 +518,7 @@ impl<T> RBTree<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FindResultFlag, RBTree};
+    use super::{FindResultFlag, NodeChain, NodePtr, RBTree};
     use crate::domaintree::test_helper::name_from_string;
 
     fn sample_names() -> Vec<(&'static str, i32)> {
@@ -534,14 +557,16 @@ mod tests {
         tree.dump(4);
 
         for (n, v) in sample_names() {
-            let result = tree.find_node(&name_from_string(n));
+            let mut node_chain = NodeChain::new();
+            let result = tree.find_node(&name_from_string(n), &mut node_chain);
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             assert_eq!(result.node.get_value(), &Some(v));
         }
 
         let none_terminal = vec!["d.e.f", "w.y.d.e.f"];
         for n in &none_terminal {
-            let result = tree.find_node(&name_from_string(n));
+            let mut node_chain = NodeChain::new();
+            let result = tree.find_node(&name_from_string(n), &mut node_chain);
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             assert_eq!(result.node.get_value(), &None);
         }
@@ -553,7 +578,8 @@ mod tests {
         let mut tree = build_tree(&data);
         assert_eq!(tree.len(), 13);
         for (n, v) in data {
-            let result = tree.find_node(&name_from_string(n));
+            let mut node_chain = NodeChain::new();
+            let result = tree.find_node(&name_from_string(n), &mut node_chain);
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             assert_eq!(tree.remove_node(result.node), Some(v));
         }
@@ -586,5 +612,53 @@ mod tests {
             assert_eq!(num.get(), 4);
         }
         assert_eq!(num.get(), 0);
+    }
+
+    #[test]
+    fn test_callback() {
+        let mut tree = RBTree::new();
+        for name in vec!["a", "b", "c", "d"] {
+            tree.insert(name_from_string(name), 10);
+        }
+        let (n, _) = tree.insert(name_from_string("e"), 20);
+        n.set_callback(true);
+
+        tree.insert(name_from_string("b.e"), 30);
+        let mut num = 0;
+        let callback = |n: NodePtr<u32>, num: &mut u32| {
+            *num = *num + n.get_value().unwrap();
+            false
+        };
+        let mut node_chain = NodeChain::new();
+        let result = tree.find_node_ext(
+            &name_from_string("b.e"),
+            &mut node_chain,
+            &mut Some(callback),
+            &mut num,
+        );
+        assert_eq!(num, 20);
+        assert_eq!(result.flag, FindResultFlag::ExacatMatch);
+        assert_eq!(result.node.get_value(), &Some(30));
+        tree.find_node_ext(
+            &name_from_string("e"),
+            &mut node_chain,
+            &mut Some(callback),
+            &mut num,
+        );
+        //only query sub domain, callback will be invoked
+        assert_eq!(num, 20);
+
+        let callback = |n: NodePtr<u32>, num: &mut u32| {
+            *num = *num + n.get_value().unwrap();
+            true
+        };
+        let result = tree.find_node_ext(
+            &name_from_string("b.e"),
+            &mut node_chain,
+            &mut Some(callback),
+            &mut num,
+        );
+        assert_eq!(num, 40);
+        assert_eq!(result.flag, FindResultFlag::PartialMatch);
     }
 }

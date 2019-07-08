@@ -1,12 +1,13 @@
 use failure_ext::prelude::*;
 use r53::{Name, RRType, RRset};
 
-pub enum FindResultFlag {
+pub enum FindResultType {
     Success,
     Delegation,
     NXDomain,
     NXRRset,
     CName,
+    ServerFailed,
 }
 
 pub enum FindOption {
@@ -14,29 +15,14 @@ pub enum FindOption {
     GlueOK,
 }
 
-pub struct FindResult {
-    flag: FindResultFlag,
-    rrset: Option<RRset>,
-    additional: Vec<RRset>,
+pub trait FindResult {
+    fn get_result_type(&self) -> FindResultType;
+    fn get_rrset(&self) -> Option<RRset>;
+    fn get_additional(&self) -> Vec<RRset>;
 }
 
-pub trait ZoneFinder {
+pub trait ZoneFinder<'a> {
+    type FindResult: FindResult;
     fn get_origin(&self) -> &Name;
-    fn find(name: &Name, typ: RRType, opt: FindOption) -> FindResult;
-}
-
-pub trait ZoneUpdator {
-    type Transaction: ZoneTransaction;
-    fn begin(&mut self) -> Self::Transaction;
-}
-
-pub trait ZoneTransaction {
-    fn add_rrset(&mut self, rrset: &RRset) -> Result<()>;
-    fn delete_rrset(&mut self, rrset: &RRset) -> Result<()>;
-    fn delete_name(&mut self, name: &Name) -> Result<()>;
-    fn delete_rr(&mut self, rrset: &RRset) -> Result<()>;
-    fn increase_serial_number(&mut self) -> Result<()>;
-
-    fn commit(self) -> Result<()>;
-    fn roll_back(self) -> Result<()>;
+    fn find(&'a self, name: &Name, typ: RRType, opt: FindOption) -> Self::FindResult;
 }

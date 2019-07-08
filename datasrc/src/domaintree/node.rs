@@ -110,6 +110,16 @@ impl<T> NodePtr<T> {
         unsafe { (*self.0).flag.is_subtree_root() }
     }
 
+    pub fn set_callback(self, enable: bool) {
+        unsafe {
+            (*self.0).flag.set_callback(enable);
+        }
+    }
+
+    pub fn is_callback_enabled(self) -> bool {
+        unsafe { (*self.0).flag.is_callback_enabled() }
+    }
+
     pub fn get_name(&self) -> &Name {
         unsafe { &(*self.0).name }
     }

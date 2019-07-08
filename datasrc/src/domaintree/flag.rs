@@ -80,6 +80,16 @@ impl NodeFlag {
     pub fn is_subtree_root(self) -> bool {
         self.is_enable(SUBTREE_ROOT_MASK)
     }
+
+    #[inline]
+    pub fn set_callback(&mut self, enable: bool) {
+        self.set(enable, CALLBACK_MASK)
+    }
+
+    #[inline]
+    pub fn is_callback_enabled(self) -> bool {
+        self.is_enable(CALLBACK_MASK)
+    }
 }
 
 #[cfg(test)]
@@ -91,6 +101,7 @@ mod tests {
         let mut flag = NodeFlag::default();
         assert!(flag.is_red());
         assert!(flag.is_subtree_root() == false);
+        assert!(flag.is_callback_enabled() == false);
 
         flag.set_color(Color::Red);
         assert!(flag.is_red());
@@ -98,5 +109,7 @@ mod tests {
         assert!(flag.is_black());
         flag.set_subtree_root(true);
         assert!(flag.is_subtree_root());
+        flag.set_callback(true);
+        assert!(flag.is_callback_enabled());
     }
 }

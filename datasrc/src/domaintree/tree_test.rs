@@ -1,4 +1,7 @@
-use crate::domaintree::tree::{FindResultFlag, RBTree};
+use crate::domaintree::{
+    node_chain::NodeChain,
+    tree::{FindResultFlag, RBTree},
+};
 use proptest::{collection::vec, prelude::*};
 use r53::Name;
 use std::collections::HashSet;
@@ -34,7 +37,7 @@ proptest! {
 
         let mut tree = RBTree::<u32>::new();
         for (name, value) in &name_and_values{
-            let old = tree.insert(name.clone(), *value);
+            let (_, old) = tree.insert(name.clone(), *value);
             //Some(None) == non-terminal node is created
             //None == new node
             assert!(old == Some(None) || old == None);
@@ -42,17 +45,20 @@ proptest! {
 
         //duplicate insert should return old value
         for (name, value) in &name_and_values{
-            assert_eq!(tree.insert(name.clone(), *value).unwrap(), Some(*value));
+            let (_, old) = tree.insert(name.clone(), *value);
+            assert_eq!(old.unwrap(), Some(*value));
         }
 
         for (name, value) in &name_and_values{
-            let result = tree.find_node(name);
+            let mut node_chain = NodeChain::new();
+            let result = tree.find_node(name, &mut node_chain);
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             assert_eq!(result.node.get_value(), &Some(*value));
         }
 
         for (name, value) in name_and_values{
-            let result = tree.find_node(&name);
+            let mut node_chain = NodeChain::new();
+            let result = tree.find_node(&name, &mut node_chain);
             assert_eq!(tree.remove_node(result.node).unwrap(), value);
         }
 
