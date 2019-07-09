@@ -37,7 +37,7 @@ proptest! {
 
         let mut tree = RBTree::<u32>::new();
         for (name, value) in &name_and_values{
-            let (_, old) = tree.insert(name.clone(), *value);
+            let (_, old) = tree.insert(name.clone(), Some(*value));
             //Some(None) == non-terminal node is created
             //None == new node
             assert!(old == Some(None) || old == None);
@@ -45,7 +45,7 @@ proptest! {
 
         //duplicate insert should return old value
         for (name, value) in &name_and_values{
-            let (_, old) = tree.insert(name.clone(), *value);
+            let (_, old) = tree.insert(name.clone(), Some(*value));
             assert_eq!(old.unwrap(), Some(*value));
         }
 

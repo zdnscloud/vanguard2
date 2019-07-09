@@ -36,6 +36,7 @@ impl Default for NodeFlag {
 const COLOR_MASK: u16 = 0x0001;
 const SUBTREE_ROOT_MASK: u16 = 0x0002;
 const CALLBACK_MASK: u16 = 0x0004;
+const WILDCARD_MASK: u16 = 0x0008;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Color {
@@ -90,6 +91,16 @@ impl NodeFlag {
     pub fn is_callback_enabled(self) -> bool {
         self.is_enable(CALLBACK_MASK)
     }
+
+    #[inline]
+    pub fn set_wildcard(&mut self, enable: bool) {
+        self.set(enable, WILDCARD_MASK)
+    }
+
+    #[inline]
+    pub fn is_wildcard(self) -> bool {
+        self.is_enable(WILDCARD_MASK)
+    }
 }
 
 #[cfg(test)]
@@ -102,6 +113,7 @@ mod tests {
         assert!(flag.is_red());
         assert!(flag.is_subtree_root() == false);
         assert!(flag.is_callback_enabled() == false);
+        assert!(flag.is_wildcard() == false);
 
         flag.set_color(Color::Red);
         assert!(flag.is_red());
@@ -110,6 +122,9 @@ mod tests {
         flag.set_subtree_root(true);
         assert!(flag.is_subtree_root());
         flag.set_callback(true);
+        assert!(flag.is_callback_enabled());
+        flag.set_wildcard(true);
+        assert!(flag.is_wildcard());
         assert!(flag.is_callback_enabled());
     }
 }

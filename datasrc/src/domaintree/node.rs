@@ -120,12 +120,26 @@ impl<T> NodePtr<T> {
         unsafe { (*self.0).flag.is_callback_enabled() }
     }
 
+    pub fn set_wildcard(self, enable: bool) {
+        unsafe {
+            (*self.0).flag.set_wildcard(enable);
+        }
+    }
+
+    pub fn is_wildcard(self) -> bool {
+        unsafe { (*self.0).flag.is_wildcard() }
+    }
+
     pub fn get_name(&self) -> &Name {
         unsafe { &(*self.0).name }
     }
 
     pub fn get_value(&self) -> &Option<T> {
         unsafe { &(*self.0).value }
+    }
+
+    pub fn get_value_mut(&self) -> &mut Option<T> {
+        unsafe { &mut (*self.0).value }
     }
 
     pub fn set_name(&mut self, n: Name) {

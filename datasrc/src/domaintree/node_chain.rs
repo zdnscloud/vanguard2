@@ -1,11 +1,26 @@
 use crate::domaintree::node::NodePtr;
 use r53::{name::NameComparisonResult, name::MAX_LABEL_COUNT, Name, NameRelation};
+use std::fmt;
 
 pub struct NodeChain<T> {
     pub level_count: usize,
     pub nodes: [NodePtr<T>; MAX_LABEL_COUNT as usize],
     pub last_compared: NodePtr<T>,
     pub last_compared_result: NameComparisonResult,
+}
+
+impl<T> fmt::Display for NodeChain<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.last_compared.is_null() {
+            write!(f, "level: {}, last_compared is nil", self.level_count)
+        } else {
+            write!(
+                f,
+                "level: {}, last_compared_relation {:?}",
+                self.level_count, self.last_compared_result
+            )
+        }
+    }
 }
 
 impl<T> Default for NodeChain<T> {
@@ -38,7 +53,7 @@ impl<T> NodeChain<T> {
         name
     }
 
-    fn top(&self) -> NodePtr<T> {
+    pub fn top(&self) -> NodePtr<T> {
         self.nodes[self.level_count - 1]
     }
 

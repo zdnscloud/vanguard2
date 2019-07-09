@@ -1,6 +1,6 @@
-use failure_ext::prelude::*;
 use r53::{Name, RRType, RRset};
 
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum FindResultType {
     Success,
     Delegation,
@@ -10,6 +10,7 @@ pub enum FindResultType {
     ServerFailed,
 }
 
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum FindOption {
     FollowZoneCut,
     GlueOK,
@@ -17,7 +18,8 @@ pub enum FindOption {
 
 pub trait FindResult {
     fn get_result_type(&self) -> FindResultType;
-    fn get_rrset(&self) -> Option<RRset>;
+    fn take_rrset(&mut self) -> Option<RRset>;
+    fn get_rrset(&self) -> &Option<RRset>;
     fn get_additional(&self) -> Vec<RRset>;
 }
 

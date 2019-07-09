@@ -164,7 +164,7 @@ impl<T> RBTree<T> {
         (**root).flag.set_color(Color::Black);
     }
 
-    pub fn insert(&mut self, target_: Name, v: T) -> (NodePtr<T>, Option<Option<T>>) {
+    pub fn insert(&mut self, target_: Name, v: Option<T>) -> (NodePtr<T>, Option<Option<T>>) {
         let mut parent = NodePtr::null();
         let mut up = NodePtr::null();
         let mut current = self.root;
@@ -175,10 +175,7 @@ impl<T> RBTree<T> {
             let compare_result = target.get_relation(current.get_name());
             match compare_result.relation {
                 NameRelation::Equal => unsafe {
-                    return (
-                        current,
-                        Some(mem::replace(&mut (*current.0).value, Some(v))),
-                    );
+                    return (current, Some(mem::replace(&mut (*current.0).value, v)));
                 },
                 NameRelation::None => panic!("name always has relationship"),
                 NameRelation::SubDomain => {
@@ -218,7 +215,7 @@ impl<T> RBTree<T> {
             self.root.get_double_pointer()
         };
         self.len += 1;
-        let node = NodePtr::new(target, Some(v));
+        let node = NodePtr::new(target, v);
         node.set_parent(parent);
         if parent.is_null() {
             unsafe {
@@ -284,7 +281,6 @@ impl<T> RBTree<T> {
         param: &mut P,
     ) -> FindResult<T> {
         let mut node = self.root;
-        //let mut chain = NodeChain::new();
         let mut result = FindResult::new();
         let mut target = target_.clone();
         while !node.is_null() {
@@ -544,7 +540,7 @@ mod tests {
     fn build_tree(data: &Vec<(&'static str, i32)>) -> RBTree<i32> {
         let mut tree = RBTree::new();
         for (k, v) in data {
-            tree.insert(name_from_string(k), *v);
+            tree.insert(name_from_string(k), Some(*v));
         }
         tree
     }
@@ -554,7 +550,6 @@ mod tests {
         let data = sample_names();
         let tree = build_tree(&data);
         assert_eq!(tree.len(), 13);
-        tree.dump(4);
 
         for (n, v) in sample_names() {
             let mut node_chain = NodeChain::new();
@@ -607,7 +602,10 @@ mod tests {
         {
             let mut tree = RBTree::new();
             for name in vec!["a", "b", "c", "d"] {
-                tree.insert(name_from_string(name), NumberWrapper::new(num.clone()));
+                tree.insert(
+                    name_from_string(name),
+                    Some(NumberWrapper::new(num.clone())),
+                );
             }
             assert_eq!(num.get(), 4);
         }
@@ -618,12 +616,12 @@ mod tests {
     fn test_callback() {
         let mut tree = RBTree::new();
         for name in vec!["a", "b", "c", "d"] {
-            tree.insert(name_from_string(name), 10);
+            tree.insert(name_from_string(name), Some(10));
         }
-        let (n, _) = tree.insert(name_from_string("e"), 20);
+        let (n, _) = tree.insert(name_from_string("e"), Some(20));
         n.set_callback(true);
 
-        tree.insert(name_from_string("b.e"), 30);
+        tree.insert(name_from_string("b.e"), Some(30));
         let mut num = 0;
         let callback = |n: NodePtr<u32>, num: &mut u32| {
             *num = *num + n.get_value().unwrap();

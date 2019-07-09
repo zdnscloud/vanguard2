@@ -73,10 +73,12 @@ mod tests {
     use r53::A;
 
     fn build_a_rrset(name: &str, ips: &[&str]) -> RRset {
-        let rdatas = ips
-            .iter()
-            .map(|ip| RData::A(A::from_string(ip).unwrap()))
-            .collect();
+        let mut iter = ips.iter().map(|s| *s);
+        let rdatas = (0..ips.len()).fold(Vec::new(), |mut rdatas, _| {
+            rdatas.push(RData::from_string(RRType::A, &mut iter).unwrap());
+            rdatas
+        });
+
         RRset {
             name: Name::new(name).unwrap(),
             typ: RRType::A,
