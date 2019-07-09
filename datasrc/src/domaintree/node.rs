@@ -138,7 +138,7 @@ impl<T> NodePtr<T> {
         unsafe { &(*self.0).value }
     }
 
-    pub fn get_value_mut(&self) -> &mut Option<T> {
+    pub fn get_value_mut(&mut self) -> &mut Option<T> {
         unsafe { &mut (*self.0).value }
     }
 
@@ -341,7 +341,6 @@ pub unsafe fn connect_child<T>(
 mod tests {
     use super::NodePtr;
     use crate::domaintree::test_helper::name_from_string;
-    use r53::Name;
 
     #[test]
     fn test_set_value() {

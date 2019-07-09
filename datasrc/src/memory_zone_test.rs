@@ -1,5 +1,4 @@
 use crate::memory_zone::MemoryZone;
-use crate::rdataset::Rdataset;
 use crate::zone::{FindOption, FindResult, FindResultType, ZoneFinder};
 use r53::{Name, RRType, RRset};
 use std::convert::TryFrom;

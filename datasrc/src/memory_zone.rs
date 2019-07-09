@@ -5,7 +5,7 @@ use crate::domaintree::{
 };
 use crate::rdataset::Rdataset;
 use crate::zone::{FindOption, FindResult, FindResultType, ZoneFinder};
-use r53::{Name, NameRelation, RData, RRType, RRset, MX, NS, SRV};
+use r53::{Name, NameRelation, RData, RRType, RRset};
 use std::mem::swap;
 
 type ZoneData = RBTree<Rdataset>;
@@ -24,7 +24,7 @@ impl MemoryZone {
     }
 
     pub fn add_rrset(&mut self, rrset: RRset) {
-        if rrset.name.is_subdomain(&self.origin) == false {
+        if !rrset.name.is_subdomain(&self.origin) {
             return;
         }
 
@@ -32,7 +32,7 @@ impl MemoryZone {
         let is_wildcard = rrset.name.is_wildcard();
 
         let mut node_chain = NodeChain::new();
-        let find_result = self.data.find_node(&rrset.name, &mut node_chain);
+        let mut find_result = self.data.find_node(&rrset.name, &mut node_chain);
         if find_result.flag == FindResultFlag::ExacatMatch {
             if let Some(rdataset) = find_result.node.get_value_mut().as_mut() {
                 rdataset.add_rrset(rrset);
@@ -74,7 +74,7 @@ impl<'a> MemoryZoneFindResult<'a> {
             typ: FindResultType::NXDomain,
             node_chain: NodeChain::<Rdataset>::new(),
             node: NodePtr::null(),
-            zone: zone,
+            zone,
             rrset: None,
         }
     }
@@ -94,7 +94,7 @@ impl<'a> FindResult for MemoryZoneFindResult<'a> {
     }
 
     fn get_additional(&self) -> Vec<RRset> {
-        let mut rrsets = Vec::new();
+        let rrsets = Vec::new();
         if self.rrset.is_none() {
             return rrsets;
         }
@@ -238,11 +238,11 @@ impl<'a> ZoneFinder<'a> for MemoryZone {
                     return find_result;
                 }
                 find_result.typ = FindResultType::NXDomain;
-                return find_result;
+                find_result
             }
             FindResultFlag::NotFound => {
                 find_result.typ = FindResultType::NXDomain;
-                return find_result;
+                find_result
             }
             FindResultFlag::ExacatMatch => {
                 if result.node.get_value().is_none() {
@@ -284,7 +284,7 @@ impl<'a> ZoneFinder<'a> for MemoryZone {
                 }
 
                 find_result.typ = FindResultType::NXRRset;
-                return find_result;
+                find_result
             }
         }
     }

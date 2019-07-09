@@ -17,7 +17,7 @@ impl Rdataset {
 
     pub fn add_rrset(&mut self, mut rrset: RRset) {
         debug_assert!(rrset.name.eq(&self.name));
-        debug_assert!(rrset.rdatas.len() > 0);
+        debug_assert!(!rrset.rdatas.is_empty());
 
         if let Some(index) = self.get_rrset_tuple(rrset.typ) {
             self.rrsets[index].1 = rrset.ttl;
@@ -31,7 +31,7 @@ impl Rdataset {
     pub fn get_rrset(&self, typ: RRType) -> Option<RRset> {
         self.get_rrset_tuple(typ).map(|index| RRset {
             name: self.name.clone(),
-            typ: typ,
+            typ,
             class: RRClass::IN,
             ttl: self.rrsets[index].1,
             rdatas: self.rrsets[index].2.clone(),
@@ -39,9 +39,9 @@ impl Rdataset {
     }
 
     pub fn remove_rrset(&mut self, typ: RRType) {
-        self.get_rrset_tuple(typ).map(|index| {
+        if let Some(index) = self.get_rrset_tuple(typ) {
             self.rrsets.remove(index);
-        });
+        }
     }
 
     pub fn remove_rdata(&mut self, rrset: &RRset) {
@@ -56,7 +56,7 @@ impl Rdataset {
                 }
             }
 
-            if self.rrsets[index].2.len() == 0 {
+            if self.rrsets[index].2.is_empty() {
                 self.rrsets.remove(index);
             }
         }
@@ -70,7 +70,6 @@ impl Rdataset {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use r53::A;
 
     fn build_a_rrset(name: &str, ips: &[&str]) -> RRset {
         let mut iter = ips.iter().map(|s| *s);
@@ -84,7 +83,7 @@ mod tests {
             typ: RRType::A,
             class: RRClass::IN,
             ttl: RRTtl(3600),
-            rdatas: rdatas,
+            rdatas,
         }
     }
 

@@ -1,8 +1,8 @@
 pub mod domaintree;
 
-mod memory_zone;
+pub mod memory_zone;
 mod rdataset;
-mod zone;
+pub mod zone;
 
 #[cfg(test)]
 mod memory_zone_test;
