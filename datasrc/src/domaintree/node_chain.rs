@@ -1,15 +1,16 @@
-use crate::domaintree::node::NodePtr;
+use crate::domaintree::{node::NodePtr, tree::RBTree};
 use r53::{name::NameComparisonResult, name::MAX_LABEL_COUNT, Name, NameRelation};
 use std::fmt;
 
-pub struct NodeChain<T> {
+pub struct NodeChain<'a, T: 'a> {
+    tree: &'a RBTree<T>,
     pub level_count: usize,
     pub nodes: [NodePtr<T>; MAX_LABEL_COUNT as usize],
     pub last_compared: NodePtr<T>,
     pub last_compared_result: NameComparisonResult,
 }
 
-impl<T> fmt::Display for NodeChain<T> {
+impl<'a, T> fmt::Display for NodeChain<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.last_compared.is_null() {
             write!(f, "level: {}, last_compared is nil", self.level_count)
@@ -23,15 +24,10 @@ impl<T> fmt::Display for NodeChain<T> {
     }
 }
 
-impl<T> Default for NodeChain<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T> NodeChain<T> {
-    pub fn new() -> Self {
+impl<'a, T> NodeChain<'a, T> {
+    pub fn new(tree: &'a RBTree<T>) -> Self {
         NodeChain {
+            tree,
             level_count: 0,
             nodes: [NodePtr::null(); MAX_LABEL_COUNT as usize],
             last_compared: NodePtr::null(),

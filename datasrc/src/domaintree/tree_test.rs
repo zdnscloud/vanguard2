@@ -50,14 +50,14 @@ proptest! {
         }
 
         for (name, value) in &name_and_values{
-            let mut node_chain = NodeChain::new();
+            let mut node_chain = NodeChain::new(&tree);
             let result = tree.find_node(name, &mut node_chain);
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             assert_eq!(result.node.get_value(), &Some(*value));
         }
 
         for (name, value) in name_and_values{
-            let mut node_chain = NodeChain::new();
+            let mut node_chain = NodeChain::new(&tree);
             let result = tree.find_node(&name, &mut node_chain);
             assert_eq!(tree.remove_node(result.node).unwrap(), value);
         }

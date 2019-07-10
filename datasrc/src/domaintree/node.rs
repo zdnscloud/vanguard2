@@ -15,12 +15,6 @@ pub struct RBTreeNode<T> {
     pub value: Option<T>,
 }
 
-impl<T> RBTreeNode<T> {
-    pub fn pair(self) -> (Name, Option<T>) {
-        (self.name, self.value)
-    }
-}
-
 impl<T: Debug> Debug for RBTreeNode<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -142,32 +136,18 @@ impl<T> NodePtr<T> {
         unsafe { &mut (*self.0).value }
     }
 
-    pub fn set_name(&mut self, n: Name) {
+    pub fn set_name(self, n: Name) {
         unsafe {
             replace(&mut (*self.0).name, n);
         }
     }
 
-    pub fn set_value(&mut self, v: Option<T>) -> Option<T> {
+    pub fn set_value(self, v: Option<T>) -> Option<T> {
         let mut back = v;
         unsafe {
             swap(&mut (*self.0).value, &mut back);
         }
         back
-    }
-
-    pub fn min_node(mut self) -> NodePtr<T> {
-        while !self.left().is_null() {
-            self = self.left();
-        }
-        self
-    }
-
-    pub fn max_node(mut self) -> NodePtr<T> {
-        while !self.right().is_null() {
-            self = self.right();
-        }
-        self
     }
 
     pub fn set_parent(self, parent: NodePtr<T>) {
@@ -345,7 +325,7 @@ mod tests {
     #[test]
     fn test_set_value() {
         let name = name_from_string("k1");
-        let mut n = NodePtr::new(name.clone(), Some("v1"));
+        let n = NodePtr::new(name.clone(), Some("v1"));
         assert_eq!(n.get_value(), &Some("v1"));
         let old = n.set_value(Some("v2"));
         assert_eq!(old, Some("v1"));

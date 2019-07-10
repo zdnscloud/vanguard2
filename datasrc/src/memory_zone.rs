@@ -31,7 +31,7 @@ impl MemoryZone {
         let is_delegation = rrset.typ == RRType::NS && !rrset.name.eq(&self.origin);
         let is_wildcard = rrset.name.is_wildcard();
 
-        let mut node_chain = NodeChain::new();
+        let mut node_chain = NodeChain::new(&self.data);
         let mut find_result = self.data.find_node(&rrset.name, &mut node_chain);
         if find_result.flag == FindResultFlag::ExacatMatch {
             if let Some(rdataset) = find_result.node.get_value_mut().as_mut() {
@@ -50,7 +50,7 @@ impl MemoryZone {
             }
             if is_wildcard {
                 let parent = rrset_name.parent(1).unwrap();
-                let (mut node, old_data) = self.data.insert(parent, None);
+                let (node, old_data) = self.data.insert(parent, None);
                 if let Some(old_value) = old_data {
                     node.set_value(old_value);
                 }
@@ -62,7 +62,7 @@ impl MemoryZone {
 
 pub struct MemoryZoneFindResult<'a> {
     pub typ: FindResultType,
-    pub node_chain: NodeChain<Rdataset>,
+    pub node_chain: NodeChain<'a, Rdataset>,
     pub node: NodePtr<Rdataset>,
     pub zone: &'a MemoryZone,
     pub rrset: Option<RRset>,
@@ -72,7 +72,7 @@ impl<'a> MemoryZoneFindResult<'a> {
     fn new(zone: &'a MemoryZone) -> Self {
         MemoryZoneFindResult {
             typ: FindResultType::NXDomain,
-            node_chain: NodeChain::<Rdataset>::new(),
+            node_chain: NodeChain::<'a, Rdataset>::new(&zone.data),
             node: NodePtr::null(),
             zone,
             rrset: None,
@@ -213,7 +213,7 @@ impl<'a> ZoneFinder<'a> for MemoryZone {
                         .unwrap()
                         .concat(&find_result.node_chain.get_absolute_name())
                         .expect("create wildcard failed");
-                    let mut node_chain = NodeChain::new();
+                    let mut node_chain = NodeChain::new(&self.data);
                     let result = self.data.find_node(&wildcard_name, &mut node_chain);
                     debug_assert!(result.flag == FindResultFlag::ExacatMatch);
 

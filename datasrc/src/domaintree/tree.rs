@@ -264,7 +264,7 @@ impl<T> RBTree<T> {
         self.len += 1;
     }
 
-    pub fn find_node(&self, target_: &Name, chain: &mut NodeChain<T>) -> FindResult<T> {
+    pub fn find_node<'a>(&'a self, target_: &Name, chain: &mut NodeChain<'a, T>) -> FindResult<T> {
         self.find_node_ext(
             target_,
             chain,
@@ -273,10 +273,10 @@ impl<T> RBTree<T> {
         )
     }
 
-    pub fn find_node_ext<P, F: FnMut(NodePtr<T>, &mut P) -> bool>(
-        &self,
+    pub fn find_node_ext<'a, P, F: FnMut(NodePtr<T>, &mut P) -> bool>(
+        &'a self,
         target_: &Name,
-        chain: &mut NodeChain<T>,
+        chain: &mut NodeChain<'a, T>,
         callback: &mut Option<F>,
         param: &mut P,
     ) -> FindResult<T> {
@@ -552,7 +552,7 @@ mod tests {
         assert_eq!(tree.len(), 13);
 
         for (n, v) in sample_names() {
-            let mut node_chain = NodeChain::new();
+            let mut node_chain = NodeChain::new(&tree);
             let result = tree.find_node(&name_from_string(n), &mut node_chain);
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             assert_eq!(result.node.get_value(), &Some(v));
@@ -560,7 +560,7 @@ mod tests {
 
         let none_terminal = vec!["d.e.f", "w.y.d.e.f"];
         for n in &none_terminal {
-            let mut node_chain = NodeChain::new();
+            let mut node_chain = NodeChain::new(&tree);
             let result = tree.find_node(&name_from_string(n), &mut node_chain);
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             assert_eq!(result.node.get_value(), &None);
@@ -573,7 +573,7 @@ mod tests {
         let mut tree = build_tree(&data);
         assert_eq!(tree.len(), 13);
         for (n, v) in data {
-            let mut node_chain = NodeChain::new();
+            let mut node_chain = NodeChain::new(&tree);
             let result = tree.find_node(&name_from_string(n), &mut node_chain);
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             assert_eq!(tree.remove_node(result.node), Some(v));
@@ -627,7 +627,7 @@ mod tests {
             *num = *num + n.get_value().unwrap();
             false
         };
-        let mut node_chain = NodeChain::new();
+        let mut node_chain = NodeChain::new(&tree);
         let result = tree.find_node_ext(
             &name_from_string("b.e"),
             &mut node_chain,
