@@ -76,21 +76,21 @@ impl Rdataset {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     fn build_a_rrset(name: &str, ips: &[&str]) -> RRset {
-        let mut iter = ips.iter().map(|s| *s);
-        let rdatas = (0..ips.len()).fold(Vec::new(), |mut rdatas, _| {
-            rdatas.push(RData::from_string(RRType::A, &mut iter).unwrap());
-            rdatas
-        });
-
-        RRset {
-            name: Name::new(name).unwrap(),
-            typ: RRType::A,
-            class: RRClass::IN,
-            ttl: RRTtl(3600),
-            rdatas,
-        }
+        ips.iter()
+            .map(|ip| format!("{} 3600 IN A {}", name, ip))
+            .fold(None, |rrset: Option<RRset>, s| {
+                let mut new = RRset::from_str(s.as_str()).unwrap();
+                if let Some(mut old) = rrset {
+                    old.rdatas.append(&mut new.rdatas);
+                    Some(old)
+                } else {
+                    Some(new)
+                }
+            })
+            .unwrap()
     }
 
     #[test]

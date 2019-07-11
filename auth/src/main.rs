@@ -48,8 +48,7 @@ impl Auth {
     }
 
     pub fn handle_query(&self, mut req: Message) -> Message {
-        let result = self.zones.find(&req.question.name);
-        let zone = result.get_value();
+        let zone = self.get_zone(&req.question.name);
         if zone.is_none() {
             let mut builder = MessageBuilder::new(&mut req);
             builder.make_response().rcode(Rcode::Refused).done();
@@ -100,6 +99,11 @@ impl Auth {
         }
         builder.done();
         req
+    }
+
+    pub fn get_zone<'a>(&'a self, name: &Name) -> Option<&'a MemoryZone> {
+        let result = self.zones.find(&name);
+        result.get_value()
     }
 }
 

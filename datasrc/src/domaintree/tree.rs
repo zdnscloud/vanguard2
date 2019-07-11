@@ -1,5 +1,5 @@
 use r53::{Name, NameRelation};
-use std::mem;
+use std::{marker::PhantomData, mem};
 
 use crate::domaintree::flag::Color;
 use crate::domaintree::node::{connect_child, get_sibling, NodePtr, RBTreeNode};
@@ -12,25 +12,27 @@ pub enum FindResultFlag {
     PartialMatch,
 }
 
-#[derive(Debug)]
-pub struct FindResult<T> {
+pub struct FindResult<'a, T: 'a> {
     pub node: NodePtr<T>,
     pub flag: FindResultFlag,
+    phantom: PhantomData<&'a T>,
 }
 
-impl<T> FindResult<T> {
-    fn new() -> Self {
+impl<'a, T> FindResult<'a, T> {
+    fn new(_tree: &'a RBTree<T>) -> Self {
         FindResult {
             node: NodePtr::null(),
             flag: FindResultFlag::NotFound,
+            phantom: PhantomData,
         }
     }
 
-    pub fn get_value(&self) -> Option<&T> {
+    pub fn get_value(&self) -> Option<&'a T> {
         if self.flag == FindResultFlag::NotFound {
             None
         } else {
-            self.node.get_value().as_ref()
+            debug_assert!(!self.node.is_null());
+            unsafe { (*self.node.0).value.as_ref() }
         }
     }
 }
@@ -278,6 +280,17 @@ impl<T> RBTree<T> {
         self.find_node(target, &mut node_chain)
     }
 
+    /*
+    pub fn get_value<'a, 'b>(&'a self, target: &'b Name) -> Option<&'a T> {
+        let result = self.find(target);
+        if result.flag == FindResultFlag::NotFound {
+            None
+        } else {
+            unsafe { (*result.node.0).value.as_ref() }
+        }
+    }
+    */
+
     pub fn find_node<'a>(&'a self, target_: &Name, chain: &mut NodeChain<'a, T>) -> FindResult<T> {
         self.find_node_ext(
             target_,
@@ -295,7 +308,7 @@ impl<T> RBTree<T> {
         param: &mut P,
     ) -> FindResult<T> {
         let mut node = self.root;
-        let mut result = FindResult::new();
+        let mut result = FindResult::new(self);
         let mut target = target_.clone();
         while !node.is_null() {
             chain.last_compared = node;
@@ -589,10 +602,10 @@ mod tests {
         let mut tree = build_tree(&data);
         assert_eq!(tree.len(), 13);
         for (n, v) in data {
-            let mut node_chain = NodeChain::new(&tree);
-            let result = tree.find_node(&name_from_string(n), &mut node_chain);
+            let result = tree.find(&name_from_string(n));
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
-            assert_eq!(tree.remove_node(result.node), Some(v));
+            let node = result.node;
+            assert_eq!(tree.remove_node(node), Some(v));
         }
         assert_eq!(tree.len(), 0);
     }

@@ -1,13 +1,13 @@
 use crate::domaintree::{node::NodePtr, tree::RBTree};
 use r53::{name::NameComparisonResult, name::MAX_LABEL_COUNT, Name, NameRelation};
-use std::fmt;
+use std::{fmt, marker::PhantomData};
 
 pub struct NodeChain<'a, T: 'a> {
-    tree: &'a RBTree<T>,
     pub level_count: usize,
     pub nodes: [NodePtr<T>; MAX_LABEL_COUNT as usize],
     pub last_compared: NodePtr<T>,
     pub last_compared_result: NameComparisonResult,
+    phantom: PhantomData<&'a T>,
 }
 
 impl<'a, T> fmt::Display for NodeChain<'a, T> {
@@ -25,9 +25,8 @@ impl<'a, T> fmt::Display for NodeChain<'a, T> {
 }
 
 impl<'a, T> NodeChain<'a, T> {
-    pub fn new(tree: &'a RBTree<T>) -> Self {
+    pub fn new(_tree: &'a RBTree<T>) -> Self {
         NodeChain {
-            tree,
             level_count: 0,
             nodes: [NodePtr::null(); MAX_LABEL_COUNT as usize],
             last_compared: NodePtr::null(),
@@ -36,6 +35,7 @@ impl<'a, T> NodeChain<'a, T> {
                 common_label_count: 0,
                 relation: NameRelation::Equal,
             },
+            phantom: PhantomData,
         }
     }
 

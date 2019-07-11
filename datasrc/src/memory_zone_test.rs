@@ -1,7 +1,7 @@
 use crate::memory_zone::MemoryZone;
 use crate::zone::{FindOption, FindResult, FindResultType, ZoneFinder};
 use r53::{Name, RRType, RRset};
-use std::convert::TryFrom;
+use std::str::FromStr;
 
 fn default_zone() -> Vec<&'static str> {
     vec![
@@ -27,7 +27,7 @@ fn default_zone() -> Vec<&'static str> {
 fn build_zone(name: &str, rrset_strs: Vec<&'static str>) -> MemoryZone {
     let mut zone = MemoryZone::new(Name::new(name).unwrap());
     for rrset_str in rrset_strs {
-        let rrset = RRset::try_from(rrset_str).unwrap();
+        let rrset = RRset::from_str(rrset_str).unwrap();
         zone.add_rrset(rrset).unwrap();
     }
     zone
@@ -55,7 +55,7 @@ fn test_find_cname() {
         "canonical.example.org."
     );
 
-    zone.add_rrset(RRset::try_from("cname.child.example.org. 300 IN CNAME www.knet.cn").unwrap())
+    zone.add_rrset(RRset::from_str("cname.child.example.org. 300 IN CNAME www.knet.cn").unwrap())
         .unwrap();
     let mut result = zone.find(
         &Name::new("cname.child.example.org.").unwrap(),
