@@ -28,7 +28,7 @@ fn build_zone(name: &str, rrset_strs: Vec<&'static str>) -> MemoryZone {
     let mut zone = MemoryZone::new(Name::new(name).unwrap());
     for rrset_str in rrset_strs {
         let rrset = RRset::try_from(rrset_str).unwrap();
-        zone.add_rrset(rrset);
+        zone.add_rrset(rrset).unwrap();
     }
     zone
 }
@@ -55,7 +55,8 @@ fn test_find_cname() {
         "canonical.example.org."
     );
 
-    zone.add_rrset(RRset::try_from("cname.child.example.org. 300 IN CNAME www.knet.cn").unwrap());
+    zone.add_rrset(RRset::try_from("cname.child.example.org. 300 IN CNAME www.knet.cn").unwrap())
+        .unwrap();
     let mut result = zone.find(
         &Name::new("cname.child.example.org.").unwrap(),
         RRType::AAAA,

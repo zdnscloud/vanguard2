@@ -3,8 +3,10 @@ use crate::domaintree::{
     node_chain::NodeChain,
     tree::{FindResultFlag, RBTree},
 };
+use crate::error::DataSrcError;
 use crate::rdataset::Rdataset;
 use crate::zone::{FindOption, FindResult, FindResultType, ZoneFinder};
+use failure::Result;
 use r53::{Name, NameRelation, RData, RRType, RRset};
 use std::mem::swap;
 
@@ -23,9 +25,9 @@ impl MemoryZone {
         }
     }
 
-    pub fn add_rrset(&mut self, rrset: RRset) {
+    pub fn add_rrset(&mut self, rrset: RRset) -> Result<()> {
         if !rrset.name.is_subdomain(&self.origin) {
-            return;
+            return Err(DataSrcError::OutOfZone.into());
         }
 
         let is_delegation = rrset.typ == RRType::NS && !rrset.name.eq(&self.origin);
@@ -35,14 +37,15 @@ impl MemoryZone {
         let mut find_result = self.data.find_node(&rrset.name, &mut node_chain);
         if find_result.flag == FindResultFlag::ExacatMatch {
             if let Some(rdataset) = find_result.node.get_value_mut().as_mut() {
-                rdataset.add_rrset(rrset);
+                rdataset.add_rrset(rrset)?;
                 if is_delegation {
                     find_result.node.set_callback(true);
                 }
             }
         } else {
             let rrset_name = rrset.name.clone();
-            let rdataset = Rdataset::new(rrset);
+            let mut rdataset = Rdataset::new();
+            rdataset.add_rrset(rrset)?;
             let (new_node, _) = self.data.insert(rrset_name.clone(), Some(rdataset));
             if is_delegation {
                 new_node.set_callback(true);
@@ -56,6 +59,7 @@ impl MemoryZone {
                 node.set_wildcard(true);
             }
         }
+        Ok(())
     }
 }
 

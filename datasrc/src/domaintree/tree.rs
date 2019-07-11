@@ -648,6 +648,7 @@ mod tests {
         //only query sub domain, callback will be invoked
         assert_eq!(num, 20);
 
+        //callback return true, skip travel
         let callback = |n: NodePtr<u32>, _, num: &mut u32| {
             *num = *num + n.get_value().unwrap();
             true
