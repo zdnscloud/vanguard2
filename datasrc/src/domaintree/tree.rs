@@ -280,17 +280,6 @@ impl<T> RBTree<T> {
         self.find_node(target, &mut node_chain)
     }
 
-    /*
-    pub fn get_value<'a, 'b>(&'a self, target: &'b Name) -> Option<&'a T> {
-        let result = self.find(target);
-        if result.flag == FindResultFlag::NotFound {
-            None
-        } else {
-            unsafe { (*result.node.0).value.as_ref() }
-        }
-    }
-    */
-
     pub fn find_node<'a>(&'a self, target_: &Name, chain: &mut NodeChain<'a, T>) -> FindResult<T> {
         self.find_node_ext(
             target_,
