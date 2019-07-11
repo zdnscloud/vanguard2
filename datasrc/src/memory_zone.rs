@@ -41,9 +41,8 @@ impl MemoryZone {
                 }
             }
         } else {
-            let mut rdataset = Rdataset::new(rrset.name.clone());
             let rrset_name = rrset.name.clone();
-            rdataset.add_rrset(rrset);
+            let rdataset = Rdataset::new(rrset);
             let (new_node, _) = self.data.insert(rrset_name.clone(), Some(rdataset));
             if is_delegation {
                 new_node.set_callback(true);
@@ -137,7 +136,7 @@ impl<'a> MemoryZoneFindResult<'a> {
         }
         if try_aaaa {
             if let Some(rdataset) = result.node.get_value().as_ref() {
-                if let Some(aaaa) = rdataset.get_rrset(RRType::AAAA) {
+                if let Some(aaaa) = rdataset.get_rrset(name, RRType::AAAA) {
                     rrsets.push(aaaa);
                 }
             }
@@ -162,12 +161,12 @@ impl FindState {
     }
 }
 
-fn zonecut_handler(node: NodePtr<Rdataset>, state: &mut FindState) -> bool {
+fn zonecut_handler<'a>(node: NodePtr<Rdataset>, name: Name, state: &mut FindState) -> bool {
     let ns = node
         .get_value()
         .as_ref()
         .unwrap()
-        .get_rrset(RRType::NS)
+        .get_rrset(&name, RRType::NS)
         .expect("zone cut has no ns");
     if !state.zone_cut.is_null() {
         return false;
@@ -185,8 +184,8 @@ impl<'a> ZoneFinder<'a> for MemoryZone {
     }
 
     fn find(&self, name: &Name, typ: RRType, opt: FindOption) -> MemoryZoneFindResult {
-        let mut state = FindState::new(opt);
         let mut find_result = MemoryZoneFindResult::new(self);
+        let mut state = FindState::new(opt);
         let result = self.data.find_node_ext(
             name,
             &mut find_result.node_chain,
@@ -222,13 +221,12 @@ impl<'a> ZoneFinder<'a> for MemoryZone {
                         .get_value()
                         .as_ref()
                         .expect("wildcard domain is empty");
-                    if let Some(mut rrset) = rdataset.get_rrset(typ) {
-                        rrset.name = name.clone();
+                    if let Some(rrset) = rdataset.get_rrset(name, typ) {
                         find_result.rrset = Some(rrset);
                         find_result.typ = FindResultType::Success;
                         return find_result;
                     }
-                    if let Some(mut cname) = rdataset.get_rrset(RRType::CNAME) {
+                    if let Some(mut cname) = rdataset.get_rrset(name, RRType::CNAME) {
                         cname.name = name.clone();
                         find_result.rrset = Some(cname);
                         find_result.typ = FindResultType::CName;
@@ -238,11 +236,11 @@ impl<'a> ZoneFinder<'a> for MemoryZone {
                     return find_result;
                 }
                 find_result.typ = FindResultType::NXDomain;
-                find_result
+                return find_result;
             }
             FindResultFlag::NotFound => {
                 find_result.typ = FindResultType::NXDomain;
-                find_result
+                return find_result;
             }
             FindResultFlag::ExacatMatch => {
                 if result.node.get_value().is_none() {
@@ -257,7 +255,7 @@ impl<'a> ZoneFinder<'a> for MemoryZone {
                         .get_value()
                         .as_ref()
                         .unwrap()
-                        .get_rrset(RRType::NS)
+                        .get_rrset(name, RRType::NS)
                     {
                         find_result.typ = FindResultType::Delegation;
                         find_result.rrset = Some(ns);
@@ -265,7 +263,13 @@ impl<'a> ZoneFinder<'a> for MemoryZone {
                     }
                 }
 
-                if let Some(rrset) = result.node.get_value().as_ref().unwrap().get_rrset(typ) {
+                if let Some(rrset) = result
+                    .node
+                    .get_value()
+                    .as_ref()
+                    .unwrap()
+                    .get_rrset(name, typ)
+                {
                     find_result.typ = FindResultType::Success;
                     find_result.rrset = Some(rrset);
                     return find_result;
@@ -276,7 +280,7 @@ impl<'a> ZoneFinder<'a> for MemoryZone {
                     .get_value()
                     .as_ref()
                     .unwrap()
-                    .get_rrset(RRType::CNAME)
+                    .get_rrset(name, RRType::CNAME)
                 {
                     find_result.typ = FindResultType::CName;
                     find_result.rrset = Some(cname);
@@ -284,7 +288,7 @@ impl<'a> ZoneFinder<'a> for MemoryZone {
                 }
 
                 find_result.typ = FindResultType::NXRRset;
-                find_result
+                return find_result;
             }
         }
     }

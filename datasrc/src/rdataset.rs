@@ -3,20 +3,17 @@ use r53::{Name, RData, RRClass, RRTtl, RRType, RRset};
 type RRsetTuple = (RRType, RRTtl, Vec<RData>);
 
 pub struct Rdataset {
-    name: Name,
     rrsets: Vec<RRsetTuple>,
 }
 
 impl Rdataset {
-    pub fn new(n: Name) -> Self {
-        Rdataset {
-            name: n,
-            rrsets: Vec::new(),
-        }
+    pub fn new(rrset: RRset) -> Self {
+        let mut rs = Rdataset { rrsets: Vec::new() };
+        rs.add_rrset(rrset);
+        rs
     }
 
     pub fn add_rrset(&mut self, mut rrset: RRset) {
-        debug_assert!(rrset.name.eq(&self.name));
         debug_assert!(!rrset.rdatas.is_empty());
 
         if let Some(index) = self.get_rrset_tuple(rrset.typ) {
@@ -28,9 +25,9 @@ impl Rdataset {
         }
     }
 
-    pub fn get_rrset(&self, typ: RRType) -> Option<RRset> {
+    pub fn get_rrset(&self, name: &Name, typ: RRType) -> Option<RRset> {
         self.get_rrset_tuple(typ).map(|index| RRset {
-            name: self.name.clone(),
+            name: name.clone(),
             typ,
             class: RRClass::IN,
             ttl: self.rrsets[index].1,
@@ -89,30 +86,30 @@ mod tests {
 
     #[test]
     fn test_get_rrset() {
-        let mut rrset = Rdataset::new(Name::new("a.cn").unwrap());
-        assert_eq!(rrset.get_rrset(RRType::A), None);
-
         let a_rrset = build_a_rrset("a.cn", &["1.1.1.1", "2.2.2.2"]);
-        rrset.add_rrset(a_rrset.clone());
-        assert_eq!(rrset.get_rrset(RRType::A), Some(a_rrset));
+        let rrset = Rdataset::new(a_rrset.clone());
+        assert_eq!(
+            rrset.get_rrset(&Name::new("a.cn").unwrap(), RRType::A),
+            Some(a_rrset)
+        );
     }
 
     #[test]
     fn test_remove_rrset() {
-        let mut rrset = Rdataset::new(Name::new("a.cn").unwrap());
-        rrset.add_rrset(build_a_rrset("a.cn", &["1.1.1.1", "2.2.2.2"]));
+        let name = Name::new("a.cn").unwrap();
+        let mut rrset = Rdataset::new(build_a_rrset("a.cn", &["1.1.1.1", "2.2.2.2"]));
         rrset.remove_rdata(&build_a_rrset("a.cn", &["1.1.1.1"]));
         assert_eq!(
-            rrset.get_rrset(RRType::A),
+            rrset.get_rrset(&name, RRType::A),
             Some(build_a_rrset("a.cn", &["2.2.2.2"]))
         );
         rrset.remove_rdata(&build_a_rrset("a.cn", &["2.2.2.2", "3.3.3.3"]));
-        assert_eq!(rrset.get_rrset(RRType::A), None,);
+        assert_eq!(rrset.get_rrset(&name, RRType::A), None,);
 
         let new_rrset = build_a_rrset("a.cn", &["1.1.1.1", "2.2.2.2"]);
         rrset.add_rrset(new_rrset.clone());
-        assert_eq!(rrset.get_rrset(RRType::A), Some(new_rrset));
+        assert_eq!(rrset.get_rrset(&name, RRType::A), Some(new_rrset));
         rrset.remove_rrset(RRType::A);
-        assert_eq!(rrset.get_rrset(RRType::A), None);
+        assert_eq!(rrset.get_rrset(&name, RRType::A), None);
     }
 }

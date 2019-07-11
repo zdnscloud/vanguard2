@@ -268,12 +268,12 @@ impl<T> RBTree<T> {
         self.find_node_ext(
             target_,
             chain,
-            &mut None::<fn(_, &mut Option<usize>) -> bool>,
+            &mut None::<fn(_, _, &mut Option<usize>) -> bool>,
             &mut None,
         )
     }
 
-    pub fn find_node_ext<'a, P, F: FnMut(NodePtr<T>, &mut P) -> bool>(
+    pub fn find_node_ext<'a, P, F: FnMut(NodePtr<T>, Name, &mut P) -> bool>(
         &'a self,
         target_: &Name,
         chain: &mut NodeChain<'a, T>,
@@ -304,12 +304,12 @@ impl<T> RBTree<T> {
                 }
                 NameRelation::SubDomain => {
                     result.flag = FindResultFlag::PartialMatch;
+                    chain.push(node);
                     if node.is_callback_enabled() && callback.is_some() {
-                        if callback.as_mut().unwrap()(node, param) {
+                        if callback.as_mut().unwrap()(node, chain.get_absolute_name(), param) {
                             break;
                         }
                     }
-                    chain.push(node);
                     target = target
                         .strip_right((chain.last_compared_result.common_label_count - 1) as usize);
                     node = node.down();
@@ -516,6 +516,7 @@ impl<T> RBTree<T> {
 mod tests {
     use super::{FindResultFlag, NodeChain, NodePtr, RBTree};
     use crate::domaintree::test_helper::name_from_string;
+    use r53::Name;
 
     fn sample_names() -> Vec<(&'static str, i32)> {
         vec![
@@ -623,7 +624,8 @@ mod tests {
 
         tree.insert(name_from_string("b.e"), Some(30));
         let mut num = 0;
-        let callback = |n: NodePtr<u32>, num: &mut u32| {
+        let callback = |n: NodePtr<u32>, name: Name, num: &mut u32| {
+            assert_eq!(name.to_string(), "e.");
             *num = *num + n.get_value().unwrap();
             false
         };
@@ -646,7 +648,7 @@ mod tests {
         //only query sub domain, callback will be invoked
         assert_eq!(num, 20);
 
-        let callback = |n: NodePtr<u32>, num: &mut u32| {
+        let callback = |n: NodePtr<u32>, _, num: &mut u32| {
             *num = *num + n.get_value().unwrap();
             true
         };
