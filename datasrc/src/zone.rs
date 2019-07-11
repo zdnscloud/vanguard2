@@ -7,7 +7,6 @@ pub enum FindResultType {
     NXDomain,
     NXRRset,
     CName,
-    ServerFailed,
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
@@ -21,6 +20,7 @@ pub trait FindResult {
     fn take_rrset(&mut self) -> Option<RRset>;
     fn get_rrset(&self) -> &Option<RRset>;
     fn get_additional(&self) -> Vec<RRset>;
+    fn get_address(&self, name: &Name) -> Vec<RRset>;
 }
 
 pub trait ZoneFinder<'a> {

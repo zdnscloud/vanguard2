@@ -12,6 +12,7 @@ pub enum FindResultFlag {
     PartialMatch,
 }
 
+#[derive(Debug)]
 pub struct FindResult<T> {
     pub node: NodePtr<T>,
     pub flag: FindResultFlag,
@@ -22,6 +23,14 @@ impl<T> FindResult<T> {
         FindResult {
             node: NodePtr::null(),
             flag: FindResultFlag::NotFound,
+        }
+    }
+
+    pub fn get_value(&self) -> Option<&T> {
+        if self.flag == FindResultFlag::NotFound {
+            None
+        } else {
+            self.node.get_value().as_ref()
         }
     }
 }
@@ -264,6 +273,11 @@ impl<T> RBTree<T> {
         self.len += 1;
     }
 
+    pub fn find(&self, target: &Name) -> FindResult<T> {
+        let mut node_chain = NodeChain::new(self);
+        self.find_node(target, &mut node_chain)
+    }
+
     pub fn find_node<'a>(&'a self, target_: &Name, chain: &mut NodeChain<'a, T>) -> FindResult<T> {
         self.find_node_ext(
             target_,
@@ -304,6 +318,7 @@ impl<T> RBTree<T> {
                 }
                 NameRelation::SubDomain => {
                     result.flag = FindResultFlag::PartialMatch;
+                    result.node = node;
                     chain.push(node);
                     if node.is_callback_enabled() && callback.is_some() {
                         if callback.as_mut().unwrap()(node, chain.get_absolute_name(), param) {

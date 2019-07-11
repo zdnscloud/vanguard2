@@ -125,9 +125,7 @@ impl<'a> FindResult for MemoryZoneFindResult<'a> {
             _ => Vec::new(),
         }
     }
-}
 
-impl<'a> MemoryZoneFindResult<'a> {
     fn get_address(&self, name: &Name) -> Vec<RRset> {
         let mut result = self.zone.find(name, RRType::A, FindOption::GlueOK);
         let mut rrsets = Vec::new();

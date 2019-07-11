@@ -1,13 +1,19 @@
 [package]
-name = "datasrc"
+name = "auth"
 version = "0.1.0"
 authors = ["thesinglecloud <hanfeng@zdns.cn>"]
 edition = "2018"
 publish = false
 
 [dependencies]
+tower-service = "0.2"
+tokio = "0.1.8"
+futures = "0.1.24"
+
 r53 = { git = "https://github.com/zdnscloud/r53"}
 failure = { git = "https://github.com/zdnscloud/cement-rs", package = "failure_ext"}
+datasrc = { path = "../datasrc" }
+clap = { version = "2.32", default-features = false}
 
 [dev-dependencies]
 proptest = "0.9.4"
