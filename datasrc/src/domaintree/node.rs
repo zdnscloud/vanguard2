@@ -38,6 +38,7 @@ impl<T> Clone for NodePtr<T> {
 
 impl<T> Copy for NodePtr<T> {}
 unsafe impl<T> Send for NodePtr<T> {}
+unsafe impl<T> Sync for NodePtr<T> {}
 
 impl<T> Ord for NodePtr<T> {
     fn cmp(&self, other: &NodePtr<T>) -> Ordering {

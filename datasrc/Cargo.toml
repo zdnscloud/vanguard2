@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 r53 = { git = "https://github.com/zdnscloud/r53"}
 failure = { git = "https://github.com/zdnscloud/cement-rs", package = "failure_ext"}
+rbtree = { git = "https://github.com/zdnscloud/cement-rs", package = "rbtree"}
 
 [dev-dependencies]
 proptest = "0.9.4"

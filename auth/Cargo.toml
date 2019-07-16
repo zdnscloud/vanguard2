@@ -9,11 +9,18 @@ publish = false
 tower-service = "0.2"
 tokio = "0.1.8"
 futures = "0.1.24"
+protobuf = "2.7"
+grpcio = "0.4.3"
 
 r53 = { git = "https://github.com/zdnscloud/r53"}
 failure = { git = "https://github.com/zdnscloud/cement-rs", package = "failure_ext"}
-datasrc = { path = "../datasrc" }
+grpc_helpers = { git = "https://github.com/zdnscloud/cement-rs", package = "grpc_helpers"}
 clap = { version = "2.32", default-features = false}
+
+datasrc = { path = "../datasrc" }
+
+[build-dependencies]
+build_helpers = { git = "https://github.com/zdnscloud/cement-rs", package = "build_helpers"}
 
 [dev-dependencies]
 proptest = "0.9.4"

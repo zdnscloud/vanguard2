@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package client;
+
+import "rrset.proto";
+
+enum StatusCode {
+    Succeed = 0;
+    Failed = 1;
+    Unauthorized = 2;
+    NotFound = 3;
+}
+
+message AddRRsetRequest {
+    string zone = 1;
+    repeated RRset rrsets = 2;
+}
+
+message AddRRsetResponse {
+    StatusCode code = 1;
+    string message = 2;
+}
+
+message DeleteDomainRequest{
+    string zone = 1;
+    repeated string names = 2;
+}
+
+message DeleteDomainResponse {
+    StatusCode code = 1;
+    string message = 2;
+}
+
+message DeleteRRsetRequest {
+    string zone = 1;
+    repeated RRsetHeader rrsets = 2;
+}
+
+message DeleteRRsetResponse {
+    StatusCode code = 1;
+    string message = 2;
+}
+
+message DeleteRdataRequest {
+    string zone = 1;
+    repeated RRset rrsets = 2;
+}
+
+message DeleteRdataResponse {
+    StatusCode code = 1;
+    string message = 2;
+}
+
+message UpdateRdataRequest {
+    string zone = 1;
+    repeated RRset old_rrsets = 2;
+    repeated RRset new_rrsets = 3;
+}
+
+message UpdateRdataResponse {
+    StatusCode code = 1;
+    string message = 2;
+}
+
+
+service DynamicUpdateInterface {
+    rpc AddRRset(AddRRsetRequest) returns (AddRRsetResponse) {}
+    rpc DeleteDomain(DeleteDomainRequest) returns (DeleteDomainResponse) {}
+    rpc DeleteRRset(DeleteRRsetRequest) returns (DeleteRRsetResponse) {}
+    rpc DeleteRdata(DeleteRdataRequest) returns (DeleteRdataResponse) {}
+    rpc UpdateRdata(UpdateRdataRequest) returns (UpdateRdataResponse) {}
+}

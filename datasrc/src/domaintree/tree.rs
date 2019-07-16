@@ -206,7 +206,7 @@ impl<T> RBTree<T> {
                         };
                     } else {
                         let common_ancestor = target.strip_left(
-                            (target.label_count - compare_result.common_label_count) as usize,
+                            target.label_count() - (compare_result.common_label_count as usize),
                         );
                         let new_name = current
                             .get_name()
@@ -678,5 +678,14 @@ mod tests {
         );
         assert_eq!(num, 40);
         assert_eq!(result.flag, FindResultFlag::PartialMatch);
+    }
+
+    #[test]
+    fn test_rand_tree_insert_and_search() {
+        use crate::domaintree::tree_test::test_insert_delete_batch;
+        use r53::RandNameGenerator;
+        let gen = RandNameGenerator::new();
+        let name_and_values = gen.zip(1..).take(1000).collect::<Vec<(Name, u32)>>();
+        test_insert_delete_batch(name_and_values);
     }
 }
