@@ -25,47 +25,51 @@ proptest! {
         name_strings in vec(arb_name(), 100..1000)
     ) {
         //filter duplicate name
-        let name_and_values = name_strings
-        .into_iter()
-        .fold(HashSet::new(), |mut set, n| {
-            set.insert(n);
-           set
-        })
+        let names = name_strings
         .into_iter()
         .map(|labels| Name::new(labels.as_ref()).expect("rand name isn't valid"))
-        .zip(1..)
-        .collect::<Vec<(Name, u32)>>();
-        test_insert_delete_batch(name_and_values);
+        .collect::<Vec<Name>>();
+        test_insert_delete_batch(names);
     }
 }
 
-pub fn test_insert_delete_batch(name_and_values: Vec<(Name, u32)>) {
-    let mut tree = RBTree::<u32>::new();
-    for (name, value) in &name_and_values {
-        let (_, old) = tree.insert(name.clone(), Some(*value));
+pub fn test_insert_delete_batch(names: Vec<Name>) {
+    let mut tree = RBTree::<usize>::new();
+    let mut duplicate_name_index = HashSet::new();
+    for (i, name) in names.iter().enumerate() {
+        let (_, old) = tree.insert(name.clone(), Some(i));
         //Some(None) == non-terminal node is created
         //None == new node
-        assert!(old == Some(None) || old == None);
+        if let Some(Some(v)) = old {
+            assert!(name.eq(&names[v]));
+            duplicate_name_index.insert(v);
+        }
     }
 
     //duplicate insert should return old value
-    for (name, value) in &name_and_values {
-        let (_, old) = tree.insert(name.clone(), Some(*value));
-        assert_eq!(old.unwrap(), Some(*value));
+    for (i, name) in names.iter().enumerate() {
+        if !duplicate_name_index.contains(&i) {
+            let (_, old) = tree.insert(name.clone(), Some(i));
+            assert_eq!(old.unwrap(), Some(i));
+        }
     }
 
-    for (name, value) in &name_and_values {
-        let mut node_chain = NodeChain::new(&tree);
-        let result = tree.find_node(name, &mut node_chain);
-        assert_eq!(result.flag, FindResultFlag::ExacatMatch);
-        assert_eq!(result.node.get_value(), &Some(*value));
+    for (i, name) in names.iter().enumerate() {
+        if !duplicate_name_index.contains(&i) {
+            let mut node_chain = NodeChain::new(&tree);
+            let result = tree.find_node(name, &mut node_chain);
+            assert_eq!(result.flag, FindResultFlag::ExacatMatch);
+            assert_eq!(result.node.get_value(), &Some(i));
+        }
     }
 
-    for (name, value) in name_and_values {
-        let mut node_chain = NodeChain::new(&tree);
-        let result = tree.find_node(&name, &mut node_chain);
-        let node = result.node;
-        assert_eq!(tree.remove_node(node).unwrap(), value);
+    for (i, name) in names.iter().enumerate() {
+        if !duplicate_name_index.contains(&i) {
+            let mut node_chain = NodeChain::new(&tree);
+            let result = tree.find_node(&name, &mut node_chain);
+            let node = result.node;
+            assert_eq!(tree.remove_node(node).unwrap(), i);
+        }
     }
 
     assert_eq!(tree.len(), 0);

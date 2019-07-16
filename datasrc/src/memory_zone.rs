@@ -7,14 +7,14 @@ use crate::error::DataSrcError;
 use crate::rdataset::Rdataset;
 use crate::zone::{FindOption, FindResult, FindResultType, ZoneFinder};
 use failure::Result;
-use r53::{Name, NameRelation, RData, RRType, RRset};
+use r53::{LabelSequence, Name, NameRelation, RData, RRType, RRset};
 use std::mem::swap;
 
 type ZoneData = RBTree<Rdataset>;
 
 pub struct MemoryZone {
     origin: Name,
-    data: ZoneData,
+    pub data: ZoneData,
 }
 
 impl MemoryZone {
@@ -210,10 +210,9 @@ impl<'a> ZoneFinder<'a> for MemoryZone {
                 }
 
                 if find_result.node_chain.top().is_wildcard() {
-                    let wildcard_name = Name::new("*")
-                        .unwrap()
-                        .concat(&find_result.node_chain.get_absolute_name())
-                        .expect("create wildcard failed");
+                    let wildcard_name = find_result
+                        .node_chain
+                        .get_absolute_name(&LabelSequence::new(vec![1, b'*'], vec![0]));
                     let mut node_chain = NodeChain::new(&self.data);
                     let result = self.data.find_node(&wildcard_name, &mut node_chain);
                     debug_assert!(result.flag == FindResultFlag::ExacatMatch);

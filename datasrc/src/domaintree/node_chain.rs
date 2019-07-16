@@ -1,5 +1,5 @@
 use crate::domaintree::{node::NodePtr, tree::RBTree};
-use r53::{name::NameComparisonResult, name::MAX_LABEL_COUNT, Name, NameRelation};
+use r53::{name::NameComparisonResult, name::MAX_LABEL_COUNT, LabelSequence, Name, NameRelation};
 use std::{fmt, marker::PhantomData};
 
 pub struct NodeChain<'a, T: 'a> {
@@ -19,7 +19,13 @@ impl<'a, T> fmt::Display for NodeChain<'a, T> {
                 f,
                 "level: {}, last_compared_relation {:?}",
                 self.level_count, self.last_compared_result
-            )
+            )?;
+            write!(f, " nodes:[")?;
+            for n in &self.nodes[..self.level_count] {
+                write!(f, "{},", n.get_name())?;
+            }
+            write!(f, " ]")?;
+            Ok(())
         }
     }
 }
@@ -39,14 +45,17 @@ impl<'a, T> NodeChain<'a, T> {
         }
     }
 
-    pub fn get_absolute_name(&self) -> Name {
-        let mut name = self.top().get_name().clone();
-        let mut level = self.level_count - 1;
-        while level > 0 {
-            name = name.concat(self.nodes[level - 1].get_name()).unwrap();
-            level -= 1;
-        }
-        name
+    pub fn get_absolute_name(&self, child: &LabelSequence) -> Name {
+        child
+            .concat_all(
+                self.nodes[..self.level_count]
+                    .iter()
+                    .rev()
+                    .map(|n| n.get_name())
+                    .collect::<Vec<&LabelSequence>>()
+                    .as_ref(),
+            )
+            .unwrap()
     }
 
     pub fn top(&self) -> NodePtr<T> {

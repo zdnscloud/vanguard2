@@ -1,4 +1,4 @@
-use r53::{Name, NameRelation};
+use r53::{LabelSlice, Name, NameRelation};
 use std::{marker::PhantomData, mem};
 
 use crate::domaintree::flag::Color;
@@ -175,47 +175,39 @@ impl<T> RBTree<T> {
         (**root).flag.set_color(Color::Black);
     }
 
-    pub fn insert(&mut self, target_: Name, v: Option<T>) -> (NodePtr<T>, Option<Option<T>>) {
+    pub fn insert(&mut self, target: Name, v: Option<T>) -> (NodePtr<T>, Option<Option<T>>) {
         let mut parent = NodePtr::null();
         let mut up = NodePtr::null();
         let mut current = self.root;
         let mut order = -1;
-        let mut target = target_;
-
+        let mut target_slice = LabelSlice::from_name(&target);
         while !current.is_null() {
-            let compare_result = target.get_relation(current.get_name());
+            let current_name = LabelSlice::from_label_sequence(current.get_name());
+            let compare_result = target_slice.compare(&current_name, false);
             match compare_result.relation {
                 NameRelation::Equal => unsafe {
                     return (current, Some(mem::replace(&mut (*current.0).value, v)));
                 },
-                NameRelation::None => panic!("name always has relationship"),
+                NameRelation::None => {
+                    parent = current;
+                    order = compare_result.order;
+                    current = if order < 0 {
+                        current.left()
+                    } else {
+                        current.right()
+                    };
+                }
                 NameRelation::SubDomain => {
                     parent = NodePtr::null();
                     up = current;
-                    target = target.strip_right((compare_result.common_label_count - 1) as usize);
+                    target_slice.strip_right(compare_result.common_label_count as usize);
                     current = current.down();
                 }
                 _ => {
-                    if compare_result.common_label_count == 1 {
-                        parent = current;
-                        order = compare_result.order;
-                        current = if order < 0 {
-                            current.left()
-                        } else {
-                            current.right()
-                        };
-                    } else {
-                        let common_ancestor = target.strip_left(
-                            target.label_count() - (compare_result.common_label_count as usize),
-                        );
-                        let new_name = current
-                            .get_name()
-                            .strip_right((compare_result.common_label_count - 1) as usize);
-                        unsafe {
-                            self.node_fission(&mut current, new_name, common_ancestor);
-                        }
-                        current = current.parent();
+                    unsafe {
+                        self.node_fission(&mut current, compare_result.common_label_count as usize);
                     }
+                    current = current.parent();
                 }
             }
         }
@@ -226,7 +218,9 @@ impl<T> RBTree<T> {
             self.root.get_double_pointer()
         };
         self.len += 1;
-        let node = NodePtr::new(target, v);
+        let first_label = target_slice.first_label();
+        let last_label = target_slice.last_label();
+        let node = NodePtr::new(target.into_label_sequence(first_label, last_label), v);
         node.set_parent(parent);
         if parent.is_null() {
             unsafe {
@@ -251,9 +245,8 @@ impl<T> RBTree<T> {
         (node, None)
     }
 
-    unsafe fn node_fission(&mut self, node: &mut NodePtr<T>, new_prefix: Name, new_suffix: Name) {
-        let up = NodePtr::new(new_suffix, None);
-        node.set_name(new_prefix);
+    unsafe fn node_fission(&mut self, node: &mut NodePtr<T>, parent_label_count: usize) {
+        let up = node.split_to_parent(parent_label_count);
         up.set_parent(node.parent());
         connect_child(self.root.get_double_pointer(), *node, *node, up);
         up.set_down(*node);
@@ -291,17 +284,18 @@ impl<T> RBTree<T> {
 
     pub fn find_node_ext<'a, P, F: FnMut(NodePtr<T>, Name, &mut P) -> bool>(
         &'a self,
-        target_: &Name,
+        target: &Name,
         chain: &mut NodeChain<'a, T>,
         callback: &mut Option<F>,
         param: &mut P,
     ) -> FindResult<T> {
         let mut node = self.root;
         let mut result = FindResult::new(self);
-        let mut target = target_.clone();
+        let mut target_slice = LabelSlice::from_name(target);
         while !node.is_null() {
+            let current_slice = LabelSlice::from_label_sequence(node.get_name());
             chain.last_compared = node;
-            chain.last_compared_result = target.get_relation(node.get_name());
+            chain.last_compared_result = target_slice.compare(&current_slice, false);
             match chain.last_compared_result.relation {
                 NameRelation::Equal => {
                     chain.push(node);
@@ -309,9 +303,7 @@ impl<T> RBTree<T> {
                     result.node = node;
                     break;
                 }
-                NameRelation::CommonAncestor
-                    if chain.last_compared_result.common_label_count == 1 =>
-                {
+                NameRelation::None => {
                     if chain.last_compared_result.order < 0 {
                         node = node.left();
                     } else {
@@ -321,14 +313,18 @@ impl<T> RBTree<T> {
                 NameRelation::SubDomain => {
                     result.flag = FindResultFlag::PartialMatch;
                     result.node = node;
-                    chain.push(node);
                     if node.is_callback_enabled() && callback.is_some() {
-                        if callback.as_mut().unwrap()(node, chain.get_absolute_name(), param) {
+                        if callback.as_mut().unwrap()(
+                            node,
+                            chain.get_absolute_name(node.get_name()),
+                            param,
+                        ) {
                             break;
                         }
                     }
-                    target = target
-                        .strip_right((chain.last_compared_result.common_label_count - 1) as usize);
+                    chain.push(node);
+                    target_slice
+                        .strip_right(chain.last_compared_result.common_label_count as usize);
                     node = node.down();
                 }
                 _ => {
@@ -567,7 +563,7 @@ mod tests {
     fn test_find() {
         let data = sample_names();
         let tree = build_tree(&data);
-        assert_eq!(tree.len(), 13);
+        assert_eq!(tree.len(), 14);
 
         for (n, v) in sample_names() {
             let mut node_chain = NodeChain::new(&tree);
@@ -589,7 +585,7 @@ mod tests {
     fn test_delete() {
         let data = sample_names();
         let mut tree = build_tree(&data);
-        assert_eq!(tree.len(), 13);
+        assert_eq!(tree.len(), 14);
         for (n, v) in data {
             let result = tree.find(&name_from_string(n));
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
@@ -614,6 +610,7 @@ mod tests {
             self.0.set(self.0.get() - 1);
         }
     }
+
     #[test]
     fn test_clean() {
         let num = Rc::new(Cell::new(0));
@@ -684,8 +681,9 @@ mod tests {
     fn test_rand_tree_insert_and_search() {
         use crate::domaintree::tree_test::test_insert_delete_batch;
         use r53::RandNameGenerator;
-        let gen = RandNameGenerator::new();
-        let name_and_values = gen.zip(1..).take(1000).collect::<Vec<(Name, u32)>>();
-        test_insert_delete_batch(name_and_values);
+        for _ in 0..10 {
+            let gen = RandNameGenerator::new();
+            test_insert_delete_batch(gen.take(1000).collect::<Vec<Name>>());
+        }
     }
 }

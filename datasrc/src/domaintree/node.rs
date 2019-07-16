@@ -1,5 +1,5 @@
 use crate::domaintree::flag::{Color, NodeFlag};
-use r53::Name;
+use r53::LabelSequence;
 use std::cmp::Ordering;
 use std::fmt::{self, Debug};
 use std::mem::{replace, swap};
@@ -11,7 +11,7 @@ pub struct RBTreeNode<T> {
     pub right: NodePtr<T>,
     pub parent: NodePtr<T>,
     pub down: NodePtr<T>,
-    pub name: Name,
+    pub name: LabelSequence,
     pub value: Option<T>,
 }
 
@@ -61,7 +61,7 @@ impl<T> PartialEq for NodePtr<T> {
 impl<T> Eq for NodePtr<T> {}
 
 impl<T> NodePtr<T> {
-    pub fn new(name: Name, v: Option<T>) -> NodePtr<T> {
+    pub fn new(name: LabelSequence, v: Option<T>) -> NodePtr<T> {
         let node = RBTreeNode {
             flag: NodeFlag::default(),
             left: NodePtr::null(),
@@ -126,7 +126,7 @@ impl<T> NodePtr<T> {
         unsafe { (*self.0).flag.is_wildcard() }
     }
 
-    pub fn get_name(&self) -> &Name {
+    pub fn get_name(&self) -> &LabelSequence {
         unsafe { &(*self.0).name }
     }
 
@@ -138,7 +138,7 @@ impl<T> NodePtr<T> {
         unsafe { &mut (*self.0).value }
     }
 
-    pub fn set_name(self, n: Name) {
+    pub fn set_name(self, n: LabelSequence) {
         unsafe {
             replace(&mut (*self.0).name, n);
         }
@@ -274,6 +274,14 @@ impl<T> NodePtr<T> {
             lower.left().set_parent(lower);
         }
     }
+
+    pub unsafe fn split_to_parent(&mut self, parent_label_count: usize) -> NodePtr<T> {
+        let name = &mut (*self.0).name;
+        let parent = name
+            .split(name.label_count() - parent_label_count, parent_label_count)
+            .unwrap();
+        NodePtr::new(parent, None)
+    }
 }
 
 impl<T: Clone> NodePtr<T> {
@@ -322,11 +330,12 @@ pub unsafe fn connect_child<T>(
 #[cfg(test)]
 mod tests {
     use super::NodePtr;
-    use crate::domaintree::test_helper::name_from_string;
+    use r53::LabelSequence;
+    use std::str::FromStr;
 
     #[test]
     fn test_set_value() {
-        let name = name_from_string("k1");
+        let name = LabelSequence::from_str("k1").unwrap();
         let n = NodePtr::new(name.clone(), Some("v1"));
         assert_eq!(n.get_value(), &Some("v1"));
         let old = n.set_value(Some("v2"));
@@ -340,7 +349,7 @@ mod tests {
 
     #[test]
     fn test_double_pointer() {
-        let name = name_from_string("k1");
+        let name = LabelSequence::from_str("k1").unwrap();
         let mut n1 = NodePtr::new(name.clone(), Some("v1"));
         let n2 = NodePtr::new(name.clone(), Some("v2"));
 
