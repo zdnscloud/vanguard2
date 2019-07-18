@@ -19,7 +19,7 @@ impl AuthZone {
     }
 
     pub fn add_zone(&mut self, name: Name, zone_content: &str) -> Result<()> {
-        if self.get_zone(&name).is_some() {
+        if self.get_exact_zone(&name).is_some() {
             return Err(AuthError::DuplicateZone(name.to_string()).into());
         }
 
