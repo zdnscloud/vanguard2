@@ -14,6 +14,16 @@ impl Rdataset {
         Rdataset { rrsets: Vec::new() }
     }
 
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.rrsets.len()
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.rrsets.is_empty()
+    }
+
     pub fn add_rrset(&mut self, rrset: RRset) -> Result<()> {
         self.validate_rrset(&rrset)?;
 
@@ -161,18 +171,39 @@ mod tests {
         rrset
             .add_rrset(build_a_rrset("a.cn", &["1.1.1.1", "2.2.2.2"]))
             .unwrap();
-        rrset.delete_rdata(&build_a_rrset("a.cn", &["1.1.1.1"]));
+        assert_eq!(rrset.len(), 1);
+        rrset
+            .delete_rdata(&build_a_rrset("a.cn", &["1.1.1.1"]))
+            .unwrap();
+        assert_eq!(rrset.len(), 1);
         assert_eq!(
             rrset.get_rrset(&name, RRType::A),
             Some(build_a_rrset("a.cn", &["2.2.2.2"]))
         );
-        rrset.delete_rdata(&build_a_rrset("a.cn", &["2.2.2.2", "3.3.3.3"]));
+        rrset
+            .delete_rdata(&build_a_rrset("a.cn", &["2.2.2.2"]))
+            .unwrap();
         assert_eq!(rrset.get_rrset(&name, RRType::A), None,);
+        assert_eq!(rrset.len(), 0);
 
         let new_rrset = build_a_rrset("a.cn", &["1.1.1.1", "2.2.2.2"]);
         rrset.add_rrset(new_rrset.clone()).unwrap();
         assert_eq!(rrset.get_rrset(&name, RRType::A), Some(new_rrset));
-        rrset.delete_rrset(RRType::A);
+        rrset.delete_rrset(RRType::A).unwrap();
         assert_eq!(rrset.get_rrset(&name, RRType::A), None);
+    }
+
+    #[test]
+    fn test_cname_add_and_delete() {
+        let name = Name::new("a.cn").unwrap();
+        let alias = Name::new("a.com").unwrap();
+        let mut rrset = Rdataset::new();
+        let cname = RRset::from_str(format!("{} 3600 IN CNAME {}", name, alias).as_ref()).unwrap();
+        rrset.add_rrset(cname.clone()).unwrap();
+        assert_eq!(rrset.get_rrset(&name, RRType::CNAME), Some(cname));
+        let alias = Name::new("b.com").unwrap();
+        let cname = RRset::from_str(format!("{} 3600 IN CNAME {}", name, alias).as_ref()).unwrap();
+        rrset.add_rrset(cname.clone()).unwrap();
+        assert_eq!(rrset.get_rrset(&name, RRType::CNAME), Some(cname));
     }
 }

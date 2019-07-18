@@ -74,6 +74,10 @@ impl MemoryZone {
         if find_result.flag == FindResultFlag::ExacatMatch {
             if let Some(rdataset) = find_result.node.get_value_mut().as_mut() {
                 rdataset.delete_rrset(typ)?;
+                if rdataset.is_empty() {
+                    let node = find_result.node;
+                    self.data.remove_node(node);
+                }
             }
             //ignore if rrset doesn't exists
             Ok(())
@@ -91,6 +95,10 @@ impl MemoryZone {
         if find_result.flag == FindResultFlag::ExacatMatch {
             if let Some(rdataset) = find_result.node.get_value_mut().as_mut() {
                 rdataset.delete_rdata(rrset)?;
+                if rdataset.is_empty() {
+                    let node = find_result.node;
+                    self.data.remove_node(node);
+                }
                 Ok(())
             } else {
                 Err(DataSrcError::RRsetNotFound(rrset.typ.to_string()).into())
