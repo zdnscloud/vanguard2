@@ -1,6 +1,7 @@
 use crate::error::DataSrcError;
 use failure::Result;
 use r53::{Name, RData, RRClass, RRTtl, RRType, RRset};
+use std::mem::swap;
 
 type RRsetTuple = (RRType, RRTtl, Vec<RData>);
 
@@ -44,13 +45,16 @@ impl Rdataset {
         })
     }
 
-    pub fn remove_rrset(&mut self, typ: RRType) {
+    pub fn delete_rrset(&mut self, typ: RRType) -> Result<()> {
         if let Some(index) = self.get_rrset_tuple(typ) {
             self.rrsets.remove(index);
+            Ok(())
+        } else {
+            Err(DataSrcError::RRsetNotFound(typ.to_string()).into())
         }
     }
 
-    pub fn remove_rdata(&mut self, rrset: &RRset) {
+    pub fn delete_rdata(&mut self, rrset: &RRset) -> Result<()> {
         if let Some(index) = self.get_rrset_tuple(rrset.typ) {
             for rdata in &rrset.rdatas {
                 if let Some(index_) = self.rrsets[index]
@@ -59,12 +63,39 @@ impl Rdataset {
                     .position(|current| rdata.eq(current))
                 {
                     self.rrsets[index].2.remove(index_);
+                } else {
+                    return Err(DataSrcError::RdataNotFound(rdata.to_string()).into());
                 }
             }
 
             if self.rrsets[index].2.is_empty() {
                 self.rrsets.remove(index);
             }
+            Ok(())
+        } else {
+            Err(DataSrcError::RRsetNotFound(rrset.typ.to_string()).into())
+        }
+    }
+
+    pub fn update_rdata(&mut self, old_rrset: &RRset, mut new_rrset: RRset) -> Result<()> {
+        if let Some(index) = self.get_rrset_tuple(old_rrset.typ) {
+            for (pos, rdata) in old_rrset.rdatas.iter().enumerate() {
+                if let Some(index_) = self.rrsets[index]
+                    .2
+                    .iter()
+                    .position(|current| rdata.eq(current))
+                {
+                    swap(
+                        &mut self.rrsets[index].2[index_],
+                        &mut new_rrset.rdatas[pos],
+                    );
+                } else {
+                    return Err(DataSrcError::RdataNotFound(rdata.to_string()).into());
+                }
+            }
+            Ok(())
+        } else {
+            Err(DataSrcError::RRsetNotFound(old_rrset.typ.to_string()).into())
         }
     }
 
@@ -105,24 +136,24 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_rrset() {
+    fn test_delete_rrset() {
         let name = Name::new("a.cn").unwrap();
         let mut rrset = Rdataset::new();
         rrset
             .add_rrset(build_a_rrset("a.cn", &["1.1.1.1", "2.2.2.2"]))
             .unwrap();
-        rrset.remove_rdata(&build_a_rrset("a.cn", &["1.1.1.1"]));
+        rrset.delete_rdata(&build_a_rrset("a.cn", &["1.1.1.1"]));
         assert_eq!(
             rrset.get_rrset(&name, RRType::A),
             Some(build_a_rrset("a.cn", &["2.2.2.2"]))
         );
-        rrset.remove_rdata(&build_a_rrset("a.cn", &["2.2.2.2", "3.3.3.3"]));
+        rrset.delete_rdata(&build_a_rrset("a.cn", &["2.2.2.2", "3.3.3.3"]));
         assert_eq!(rrset.get_rrset(&name, RRType::A), None,);
 
         let new_rrset = build_a_rrset("a.cn", &["1.1.1.1", "2.2.2.2"]);
         rrset.add_rrset(new_rrset.clone()).unwrap();
         assert_eq!(rrset.get_rrset(&name, RRType::A), Some(new_rrset));
-        rrset.remove_rrset(RRType::A);
+        rrset.delete_rrset(RRType::A);
         assert_eq!(rrset.get_rrset(&name, RRType::A), None);
     }
 }

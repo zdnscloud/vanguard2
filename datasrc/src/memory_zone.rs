@@ -26,6 +26,7 @@ impl MemoryZone {
     }
 
     pub fn add_rrset(&mut self, rrset: RRset) -> Result<()> {
+        let mut debug = false;
         if !rrset.name.is_subdomain(&self.origin) {
             return Err(DataSrcError::OutOfZone.into());
         }
@@ -33,14 +34,17 @@ impl MemoryZone {
         let is_delegation = rrset.typ == RRType::NS && !rrset.name.eq(&self.origin);
         let is_wildcard = rrset.name.is_wildcard();
 
-        let mut node_chain = NodeChain::new(&self.data);
-        let mut find_result = self.data.find_node(&rrset.name, &mut node_chain);
+        let mut find_result = self.data.find(&rrset.name);
         if find_result.flag == FindResultFlag::ExacatMatch {
             if let Some(rdataset) = find_result.node.get_value_mut().as_mut() {
                 rdataset.add_rrset(rrset)?;
                 if is_delegation {
                     find_result.node.set_callback(true);
                 }
+            } else {
+                let mut rdataset = Rdataset::new();
+                rdataset.add_rrset(rrset)?;
+                find_result.node.set_value(Some(rdataset));
             }
         } else {
             let rrset_name = rrset.name.clone();
@@ -60,6 +64,74 @@ impl MemoryZone {
             }
         }
         Ok(())
+    }
+
+    pub fn delete_rrset(&mut self, name: &Name, typ: RRType) -> Result<()> {
+        if !name.is_subdomain(&self.origin) {
+            return Err(DataSrcError::OutOfZone.into());
+        }
+
+        let mut find_result = self.data.find(&name);
+        if find_result.flag == FindResultFlag::ExacatMatch {
+            if let Some(rdataset) = find_result.node.get_value_mut().as_mut() {
+                rdataset.delete_rrset(typ)?;
+            }
+            //ignore if rrset doesn't exists
+            Ok(())
+        } else {
+            Err(DataSrcError::NameNotFound(name.to_string()).into())
+        }
+    }
+
+    pub fn delete_rdata(&mut self, rrset: &RRset) -> Result<()> {
+        if !rrset.name.is_subdomain(&self.origin) {
+            return Err(DataSrcError::OutOfZone.into());
+        }
+
+        let mut find_result = self.data.find(&rrset.name);
+        if find_result.flag == FindResultFlag::ExacatMatch {
+            if let Some(rdataset) = find_result.node.get_value_mut().as_mut() {
+                rdataset.delete_rdata(rrset)?;
+                Ok(())
+            } else {
+                Err(DataSrcError::RRsetNotFound(rrset.typ.to_string()).into())
+            }
+        } else {
+            Err(DataSrcError::NameNotFound(rrset.name.to_string()).into())
+        }
+    }
+
+    pub fn update_rdata(&mut self, old_rrset: &RRset, new_rrset: RRset) -> Result<()> {
+        if !old_rrset.name.is_subdomain(&self.origin) {
+            return Err(DataSrcError::OutOfZone.into());
+        }
+
+        let mut find_result = self.data.find(&old_rrset.name);
+        if find_result.flag == FindResultFlag::ExacatMatch {
+            if let Some(rdataset) = find_result.node.get_value_mut().as_mut() {
+                rdataset.update_rdata(old_rrset, new_rrset)?;
+                Ok(())
+            } else {
+                Err(DataSrcError::RRsetNotFound(old_rrset.typ.to_string()).into())
+            }
+        } else {
+            Err(DataSrcError::NameNotFound(old_rrset.name.to_string()).into())
+        }
+    }
+
+    pub fn delete_domain(&mut self, name: &Name) -> Result<()> {
+        if !name.is_subdomain(&self.origin) {
+            return Err(DataSrcError::OutOfZone.into());
+        }
+
+        let find_result = self.data.find(&name);
+        if find_result.flag == FindResultFlag::ExacatMatch {
+            let node = find_result.node;
+            self.data.remove_node(node);
+            Ok(())
+        } else {
+            Err(DataSrcError::NameNotFound(name.to_string()).into())
+        }
     }
 }
 
@@ -133,9 +205,10 @@ impl<'a> FindResult for MemoryZoneFindResult<'a> {
         if result.typ == FindResultType::Success {
             rrsets.push(result.rrset.take().unwrap());
             try_aaaa = true;
-        } else if result.typ == FindResultType::NXRRset {
+        } else if result.typ == FindResultType::NXRRset && !result.node.is_null() {
             try_aaaa = true;
         }
+
         if try_aaaa {
             if let Some(rdataset) = result.node.get_value().as_ref() {
                 if let Some(aaaa) = rdataset.get_rrset(name, RRType::AAAA) {

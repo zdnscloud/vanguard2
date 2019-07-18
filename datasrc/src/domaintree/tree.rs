@@ -35,6 +35,15 @@ impl<'a, T> FindResult<'a, T> {
             unsafe { (*self.node.0).value.as_ref() }
         }
     }
+
+    pub fn get_value_mut(&self) -> Option<&'a mut T> {
+        if self.flag == FindResultFlag::NotFound {
+            None
+        } else {
+            debug_assert!(!self.node.is_null());
+            unsafe { (*self.node.0).value.as_mut() }
+        }
+    }
 }
 
 pub struct RBTree<T> {

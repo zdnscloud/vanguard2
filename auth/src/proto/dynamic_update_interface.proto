@@ -4,11 +4,19 @@ package client;
 
 import "rrset.proto";
 
-enum StatusCode {
-    Succeed = 0;
-    Failed = 1;
-    Unauthorized = 2;
-    NotFound = 3;
+message AddZoneRequest {
+    string zone = 1;
+    string zone_content = 2;
+}
+
+message AddZoneResponse {
+}
+
+message DeleteZoneRequest {
+    repeated string zones = 1;
+}
+
+message DeleteZoneResponse {
 }
 
 message AddRRsetRequest {
@@ -17,8 +25,6 @@ message AddRRsetRequest {
 }
 
 message AddRRsetResponse {
-    StatusCode code = 1;
-    string message = 2;
 }
 
 message DeleteDomainRequest{
@@ -27,8 +33,6 @@ message DeleteDomainRequest{
 }
 
 message DeleteDomainResponse {
-    StatusCode code = 1;
-    string message = 2;
 }
 
 message DeleteRRsetRequest {
@@ -37,8 +41,6 @@ message DeleteRRsetRequest {
 }
 
 message DeleteRRsetResponse {
-    StatusCode code = 1;
-    string message = 2;
 }
 
 message DeleteRdataRequest {
@@ -47,23 +49,21 @@ message DeleteRdataRequest {
 }
 
 message DeleteRdataResponse {
-    StatusCode code = 1;
-    string message = 2;
 }
 
 message UpdateRdataRequest {
     string zone = 1;
-    repeated RRset old_rrsets = 2;
-    repeated RRset new_rrsets = 3;
+    RRset old_rrset = 2;
+    RRset new_rrset = 3;
 }
 
 message UpdateRdataResponse {
-    StatusCode code = 1;
-    string message = 2;
 }
 
 
 service DynamicUpdateInterface {
+    rpc AddZone(AddZoneRequest) returns (AddZoneResponse) {}
+    rpc DeleteZone(DeleteZoneRequest) returns (DeleteZoneResponse) {}
     rpc AddRRset(AddRRsetRequest) returns (AddRRsetResponse) {}
     rpc DeleteDomain(DeleteDomainRequest) returns (DeleteDomainResponse) {}
     rpc DeleteRRset(DeleteRRsetRequest) returns (DeleteRRsetResponse) {}

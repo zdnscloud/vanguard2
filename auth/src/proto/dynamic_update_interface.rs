@@ -27,6 +27,637 @@ use protobuf::ProtobufEnum as ProtobufEnum_imported_for_functions;
 const _PROTOBUF_VERSION_CHECK: () = ::protobuf::VERSION_2_7_0;
 
 #[derive(PartialEq,Clone,Default)]
+pub struct AddZoneRequest {
+    // message fields
+    pub zone: ::std::string::String,
+    pub zone_content: ::std::string::String,
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a AddZoneRequest {
+    fn default() -> &'a AddZoneRequest {
+        <AddZoneRequest as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl AddZoneRequest {
+    pub fn new() -> AddZoneRequest {
+        ::std::default::Default::default()
+    }
+
+    // string zone = 1;
+
+
+    pub fn get_zone(&self) -> &str {
+        &self.zone
+    }
+    pub fn clear_zone(&mut self) {
+        self.zone.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_zone(&mut self, v: ::std::string::String) {
+        self.zone = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_zone(&mut self) -> &mut ::std::string::String {
+        &mut self.zone
+    }
+
+    // Take field
+    pub fn take_zone(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.zone, ::std::string::String::new())
+    }
+
+    // string zone_content = 2;
+
+
+    pub fn get_zone_content(&self) -> &str {
+        &self.zone_content
+    }
+    pub fn clear_zone_content(&mut self) {
+        self.zone_content.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_zone_content(&mut self, v: ::std::string::String) {
+        self.zone_content = v;
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_zone_content(&mut self) -> &mut ::std::string::String {
+        &mut self.zone_content
+    }
+
+    // Take field
+    pub fn take_zone_content(&mut self) -> ::std::string::String {
+        ::std::mem::replace(&mut self.zone_content, ::std::string::String::new())
+    }
+}
+
+impl ::protobuf::Message for AddZoneRequest {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.zone)?;
+                },
+                2 => {
+                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.zone_content)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        if !self.zone.is_empty() {
+            my_size += ::protobuf::rt::string_size(1, &self.zone);
+        }
+        if !self.zone_content.is_empty() {
+            my_size += ::protobuf::rt::string_size(2, &self.zone_content);
+        }
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
+        if !self.zone.is_empty() {
+            os.write_string(1, &self.zone)?;
+        }
+        if !self.zone_content.is_empty() {
+            os.write_string(2, &self.zone_content)?;
+        }
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &::std::any::Any {
+        self as &::std::any::Any
+    }
+    fn as_any_mut(&mut self) -> &mut ::std::any::Any {
+        self as &mut ::std::any::Any
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<::std::any::Any> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> AddZoneRequest {
+        AddZoneRequest::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+        };
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "zone",
+                    |m: &AddZoneRequest| { &m.zone },
+                    |m: &mut AddZoneRequest| { &mut m.zone },
+                ));
+                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "zone_content",
+                    |m: &AddZoneRequest| { &m.zone_content },
+                    |m: &mut AddZoneRequest| { &mut m.zone_content },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new::<AddZoneRequest>(
+                    "AddZoneRequest",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static AddZoneRequest {
+        static mut instance: ::protobuf::lazy::Lazy<AddZoneRequest> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const AddZoneRequest,
+        };
+        unsafe {
+            instance.get(AddZoneRequest::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for AddZoneRequest {
+    fn clear(&mut self) {
+        self.zone.clear();
+        self.zone_content.clear();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for AddZoneRequest {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for AddZoneRequest {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
+pub struct AddZoneResponse {
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a AddZoneResponse {
+    fn default() -> &'a AddZoneResponse {
+        <AddZoneResponse as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl AddZoneResponse {
+    pub fn new() -> AddZoneResponse {
+        ::std::default::Default::default()
+    }
+}
+
+impl ::protobuf::Message for AddZoneResponse {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &::std::any::Any {
+        self as &::std::any::Any
+    }
+    fn as_any_mut(&mut self) -> &mut ::std::any::Any {
+        self as &mut ::std::any::Any
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<::std::any::Any> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> AddZoneResponse {
+        AddZoneResponse::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+        };
+        unsafe {
+            descriptor.get(|| {
+                let fields = ::std::vec::Vec::new();
+                ::protobuf::reflect::MessageDescriptor::new::<AddZoneResponse>(
+                    "AddZoneResponse",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static AddZoneResponse {
+        static mut instance: ::protobuf::lazy::Lazy<AddZoneResponse> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const AddZoneResponse,
+        };
+        unsafe {
+            instance.get(AddZoneResponse::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for AddZoneResponse {
+    fn clear(&mut self) {
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for AddZoneResponse {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for AddZoneResponse {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
+pub struct DeleteZoneRequest {
+    // message fields
+    pub zones: ::protobuf::RepeatedField<::std::string::String>,
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a DeleteZoneRequest {
+    fn default() -> &'a DeleteZoneRequest {
+        <DeleteZoneRequest as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl DeleteZoneRequest {
+    pub fn new() -> DeleteZoneRequest {
+        ::std::default::Default::default()
+    }
+
+    // repeated string zones = 1;
+
+
+    pub fn get_zones(&self) -> &[::std::string::String] {
+        &self.zones
+    }
+    pub fn clear_zones(&mut self) {
+        self.zones.clear();
+    }
+
+    // Param is passed by value, moved
+    pub fn set_zones(&mut self, v: ::protobuf::RepeatedField<::std::string::String>) {
+        self.zones = v;
+    }
+
+    // Mutable pointer to the field.
+    pub fn mut_zones(&mut self) -> &mut ::protobuf::RepeatedField<::std::string::String> {
+        &mut self.zones
+    }
+
+    // Take field
+    pub fn take_zones(&mut self) -> ::protobuf::RepeatedField<::std::string::String> {
+        ::std::mem::replace(&mut self.zones, ::protobuf::RepeatedField::new())
+    }
+}
+
+impl ::protobuf::Message for DeleteZoneRequest {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                1 => {
+                    ::protobuf::rt::read_repeated_string_into(wire_type, is, &mut self.zones)?;
+                },
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        for value in &self.zones {
+            my_size += ::protobuf::rt::string_size(1, &value);
+        };
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
+        for v in &self.zones {
+            os.write_string(1, &v)?;
+        };
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &::std::any::Any {
+        self as &::std::any::Any
+    }
+    fn as_any_mut(&mut self) -> &mut ::std::any::Any {
+        self as &mut ::std::any::Any
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<::std::any::Any> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> DeleteZoneRequest {
+        DeleteZoneRequest::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+        };
+        unsafe {
+            descriptor.get(|| {
+                let mut fields = ::std::vec::Vec::new();
+                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
+                    "zones",
+                    |m: &DeleteZoneRequest| { &m.zones },
+                    |m: &mut DeleteZoneRequest| { &mut m.zones },
+                ));
+                ::protobuf::reflect::MessageDescriptor::new::<DeleteZoneRequest>(
+                    "DeleteZoneRequest",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static DeleteZoneRequest {
+        static mut instance: ::protobuf::lazy::Lazy<DeleteZoneRequest> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const DeleteZoneRequest,
+        };
+        unsafe {
+            instance.get(DeleteZoneRequest::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for DeleteZoneRequest {
+    fn clear(&mut self) {
+        self.zones.clear();
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for DeleteZoneRequest {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for DeleteZoneRequest {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
+pub struct DeleteZoneResponse {
+    // special fields
+    pub unknown_fields: ::protobuf::UnknownFields,
+    pub cached_size: ::protobuf::CachedSize,
+}
+
+impl<'a> ::std::default::Default for &'a DeleteZoneResponse {
+    fn default() -> &'a DeleteZoneResponse {
+        <DeleteZoneResponse as ::protobuf::Message>::default_instance()
+    }
+}
+
+impl DeleteZoneResponse {
+    pub fn new() -> DeleteZoneResponse {
+        ::std::default::Default::default()
+    }
+}
+
+impl ::protobuf::Message for DeleteZoneResponse {
+    fn is_initialized(&self) -> bool {
+        true
+    }
+
+    fn merge_from(&mut self, is: &mut ::protobuf::CodedInputStream) -> ::protobuf::ProtobufResult<()> {
+        while !is.eof()? {
+            let (field_number, wire_type) = is.read_tag_unpack()?;
+            match field_number {
+                _ => {
+                    ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
+                },
+            };
+        }
+        ::std::result::Result::Ok(())
+    }
+
+    // Compute sizes of nested messages
+    #[allow(unused_variables)]
+    fn compute_size(&self) -> u32 {
+        let mut my_size = 0;
+        my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
+        self.cached_size.set(my_size);
+        my_size
+    }
+
+    fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
+        os.write_unknown_fields(self.get_unknown_fields())?;
+        ::std::result::Result::Ok(())
+    }
+
+    fn get_cached_size(&self) -> u32 {
+        self.cached_size.get()
+    }
+
+    fn get_unknown_fields(&self) -> &::protobuf::UnknownFields {
+        &self.unknown_fields
+    }
+
+    fn mut_unknown_fields(&mut self) -> &mut ::protobuf::UnknownFields {
+        &mut self.unknown_fields
+    }
+
+    fn as_any(&self) -> &::std::any::Any {
+        self as &::std::any::Any
+    }
+    fn as_any_mut(&mut self) -> &mut ::std::any::Any {
+        self as &mut ::std::any::Any
+    }
+    fn into_any(self: Box<Self>) -> ::std::boxed::Box<::std::any::Any> {
+        self
+    }
+
+    fn descriptor(&self) -> &'static ::protobuf::reflect::MessageDescriptor {
+        Self::descriptor_static()
+    }
+
+    fn new() -> DeleteZoneResponse {
+        DeleteZoneResponse::new()
+    }
+
+    fn descriptor_static() -> &'static ::protobuf::reflect::MessageDescriptor {
+        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::MessageDescriptor> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const ::protobuf::reflect::MessageDescriptor,
+        };
+        unsafe {
+            descriptor.get(|| {
+                let fields = ::std::vec::Vec::new();
+                ::protobuf::reflect::MessageDescriptor::new::<DeleteZoneResponse>(
+                    "DeleteZoneResponse",
+                    fields,
+                    file_descriptor_proto()
+                )
+            })
+        }
+    }
+
+    fn default_instance() -> &'static DeleteZoneResponse {
+        static mut instance: ::protobuf::lazy::Lazy<DeleteZoneResponse> = ::protobuf::lazy::Lazy {
+            lock: ::protobuf::lazy::ONCE_INIT,
+            ptr: 0 as *const DeleteZoneResponse,
+        };
+        unsafe {
+            instance.get(DeleteZoneResponse::new)
+        }
+    }
+}
+
+impl ::protobuf::Clear for DeleteZoneResponse {
+    fn clear(&mut self) {
+        self.unknown_fields.clear();
+    }
+}
+
+impl ::std::fmt::Debug for DeleteZoneResponse {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        ::protobuf::text_format::fmt(self, f)
+    }
+}
+
+impl ::protobuf::reflect::ProtobufValue for DeleteZoneResponse {
+    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
+        ::protobuf::reflect::ProtobufValueRef::Message(self)
+    }
+}
+
+#[derive(PartialEq,Clone,Default)]
 pub struct AddRRsetRequest {
     // message fields
     pub zone: ::std::string::String,
@@ -246,9 +877,6 @@ impl ::protobuf::reflect::ProtobufValue for AddRRsetRequest {
 
 #[derive(PartialEq,Clone,Default)]
 pub struct AddRRsetResponse {
-    // message fields
-    pub code: StatusCode,
-    pub message: ::std::string::String,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -264,47 +892,6 @@ impl AddRRsetResponse {
     pub fn new() -> AddRRsetResponse {
         ::std::default::Default::default()
     }
-
-    // .client.StatusCode code = 1;
-
-
-    pub fn get_code(&self) -> StatusCode {
-        self.code
-    }
-    pub fn clear_code(&mut self) {
-        self.code = StatusCode::Succeed;
-    }
-
-    // Param is passed by value, moved
-    pub fn set_code(&mut self, v: StatusCode) {
-        self.code = v;
-    }
-
-    // string message = 2;
-
-
-    pub fn get_message(&self) -> &str {
-        &self.message
-    }
-    pub fn clear_message(&mut self) {
-        self.message.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_message(&mut self, v: ::std::string::String) {
-        self.message = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_message(&mut self) -> &mut ::std::string::String {
-        &mut self.message
-    }
-
-    // Take field
-    pub fn take_message(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.message, ::std::string::String::new())
-    }
 }
 
 impl ::protobuf::Message for AddRRsetResponse {
@@ -316,12 +903,6 @@ impl ::protobuf::Message for AddRRsetResponse {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
-                1 => {
-                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.code, 1, &mut self.unknown_fields)?
-                },
-                2 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.message)?;
-                },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
@@ -334,24 +915,12 @@ impl ::protobuf::Message for AddRRsetResponse {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if self.code != StatusCode::Succeed {
-            my_size += ::protobuf::rt::enum_size(1, self.code);
-        }
-        if !self.message.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.message);
-        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
-        if self.code != StatusCode::Succeed {
-            os.write_enum(1, self.code.value())?;
-        }
-        if !self.message.is_empty() {
-            os.write_string(2, &self.message)?;
-        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -393,17 +962,7 @@ impl ::protobuf::Message for AddRRsetResponse {
         };
         unsafe {
             descriptor.get(|| {
-                let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeEnum<StatusCode>>(
-                    "code",
-                    |m: &AddRRsetResponse| { &m.code },
-                    |m: &mut AddRRsetResponse| { &mut m.code },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "message",
-                    |m: &AddRRsetResponse| { &m.message },
-                    |m: &mut AddRRsetResponse| { &mut m.message },
-                ));
+                let fields = ::std::vec::Vec::new();
                 ::protobuf::reflect::MessageDescriptor::new::<AddRRsetResponse>(
                     "AddRRsetResponse",
                     fields,
@@ -426,8 +985,6 @@ impl ::protobuf::Message for AddRRsetResponse {
 
 impl ::protobuf::Clear for AddRRsetResponse {
     fn clear(&mut self) {
-        self.code = StatusCode::Succeed;
-        self.message.clear();
         self.unknown_fields.clear();
     }
 }
@@ -656,9 +1213,6 @@ impl ::protobuf::reflect::ProtobufValue for DeleteDomainRequest {
 
 #[derive(PartialEq,Clone,Default)]
 pub struct DeleteDomainResponse {
-    // message fields
-    pub code: StatusCode,
-    pub message: ::std::string::String,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -674,47 +1228,6 @@ impl DeleteDomainResponse {
     pub fn new() -> DeleteDomainResponse {
         ::std::default::Default::default()
     }
-
-    // .client.StatusCode code = 1;
-
-
-    pub fn get_code(&self) -> StatusCode {
-        self.code
-    }
-    pub fn clear_code(&mut self) {
-        self.code = StatusCode::Succeed;
-    }
-
-    // Param is passed by value, moved
-    pub fn set_code(&mut self, v: StatusCode) {
-        self.code = v;
-    }
-
-    // string message = 2;
-
-
-    pub fn get_message(&self) -> &str {
-        &self.message
-    }
-    pub fn clear_message(&mut self) {
-        self.message.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_message(&mut self, v: ::std::string::String) {
-        self.message = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_message(&mut self) -> &mut ::std::string::String {
-        &mut self.message
-    }
-
-    // Take field
-    pub fn take_message(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.message, ::std::string::String::new())
-    }
 }
 
 impl ::protobuf::Message for DeleteDomainResponse {
@@ -726,12 +1239,6 @@ impl ::protobuf::Message for DeleteDomainResponse {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
-                1 => {
-                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.code, 1, &mut self.unknown_fields)?
-                },
-                2 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.message)?;
-                },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
@@ -744,24 +1251,12 @@ impl ::protobuf::Message for DeleteDomainResponse {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if self.code != StatusCode::Succeed {
-            my_size += ::protobuf::rt::enum_size(1, self.code);
-        }
-        if !self.message.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.message);
-        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
-        if self.code != StatusCode::Succeed {
-            os.write_enum(1, self.code.value())?;
-        }
-        if !self.message.is_empty() {
-            os.write_string(2, &self.message)?;
-        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -803,17 +1298,7 @@ impl ::protobuf::Message for DeleteDomainResponse {
         };
         unsafe {
             descriptor.get(|| {
-                let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeEnum<StatusCode>>(
-                    "code",
-                    |m: &DeleteDomainResponse| { &m.code },
-                    |m: &mut DeleteDomainResponse| { &mut m.code },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "message",
-                    |m: &DeleteDomainResponse| { &m.message },
-                    |m: &mut DeleteDomainResponse| { &mut m.message },
-                ));
+                let fields = ::std::vec::Vec::new();
                 ::protobuf::reflect::MessageDescriptor::new::<DeleteDomainResponse>(
                     "DeleteDomainResponse",
                     fields,
@@ -836,8 +1321,6 @@ impl ::protobuf::Message for DeleteDomainResponse {
 
 impl ::protobuf::Clear for DeleteDomainResponse {
     fn clear(&mut self) {
-        self.code = StatusCode::Succeed;
-        self.message.clear();
         self.unknown_fields.clear();
     }
 }
@@ -1074,9 +1557,6 @@ impl ::protobuf::reflect::ProtobufValue for DeleteRRsetRequest {
 
 #[derive(PartialEq,Clone,Default)]
 pub struct DeleteRRsetResponse {
-    // message fields
-    pub code: StatusCode,
-    pub message: ::std::string::String,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -1092,47 +1572,6 @@ impl DeleteRRsetResponse {
     pub fn new() -> DeleteRRsetResponse {
         ::std::default::Default::default()
     }
-
-    // .client.StatusCode code = 1;
-
-
-    pub fn get_code(&self) -> StatusCode {
-        self.code
-    }
-    pub fn clear_code(&mut self) {
-        self.code = StatusCode::Succeed;
-    }
-
-    // Param is passed by value, moved
-    pub fn set_code(&mut self, v: StatusCode) {
-        self.code = v;
-    }
-
-    // string message = 2;
-
-
-    pub fn get_message(&self) -> &str {
-        &self.message
-    }
-    pub fn clear_message(&mut self) {
-        self.message.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_message(&mut self, v: ::std::string::String) {
-        self.message = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_message(&mut self) -> &mut ::std::string::String {
-        &mut self.message
-    }
-
-    // Take field
-    pub fn take_message(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.message, ::std::string::String::new())
-    }
 }
 
 impl ::protobuf::Message for DeleteRRsetResponse {
@@ -1144,12 +1583,6 @@ impl ::protobuf::Message for DeleteRRsetResponse {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
-                1 => {
-                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.code, 1, &mut self.unknown_fields)?
-                },
-                2 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.message)?;
-                },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
@@ -1162,24 +1595,12 @@ impl ::protobuf::Message for DeleteRRsetResponse {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if self.code != StatusCode::Succeed {
-            my_size += ::protobuf::rt::enum_size(1, self.code);
-        }
-        if !self.message.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.message);
-        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
-        if self.code != StatusCode::Succeed {
-            os.write_enum(1, self.code.value())?;
-        }
-        if !self.message.is_empty() {
-            os.write_string(2, &self.message)?;
-        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -1221,17 +1642,7 @@ impl ::protobuf::Message for DeleteRRsetResponse {
         };
         unsafe {
             descriptor.get(|| {
-                let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeEnum<StatusCode>>(
-                    "code",
-                    |m: &DeleteRRsetResponse| { &m.code },
-                    |m: &mut DeleteRRsetResponse| { &mut m.code },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "message",
-                    |m: &DeleteRRsetResponse| { &m.message },
-                    |m: &mut DeleteRRsetResponse| { &mut m.message },
-                ));
+                let fields = ::std::vec::Vec::new();
                 ::protobuf::reflect::MessageDescriptor::new::<DeleteRRsetResponse>(
                     "DeleteRRsetResponse",
                     fields,
@@ -1254,8 +1665,6 @@ impl ::protobuf::Message for DeleteRRsetResponse {
 
 impl ::protobuf::Clear for DeleteRRsetResponse {
     fn clear(&mut self) {
-        self.code = StatusCode::Succeed;
-        self.message.clear();
         self.unknown_fields.clear();
     }
 }
@@ -1492,9 +1901,6 @@ impl ::protobuf::reflect::ProtobufValue for DeleteRdataRequest {
 
 #[derive(PartialEq,Clone,Default)]
 pub struct DeleteRdataResponse {
-    // message fields
-    pub code: StatusCode,
-    pub message: ::std::string::String,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -1510,47 +1916,6 @@ impl DeleteRdataResponse {
     pub fn new() -> DeleteRdataResponse {
         ::std::default::Default::default()
     }
-
-    // .client.StatusCode code = 1;
-
-
-    pub fn get_code(&self) -> StatusCode {
-        self.code
-    }
-    pub fn clear_code(&mut self) {
-        self.code = StatusCode::Succeed;
-    }
-
-    // Param is passed by value, moved
-    pub fn set_code(&mut self, v: StatusCode) {
-        self.code = v;
-    }
-
-    // string message = 2;
-
-
-    pub fn get_message(&self) -> &str {
-        &self.message
-    }
-    pub fn clear_message(&mut self) {
-        self.message.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_message(&mut self, v: ::std::string::String) {
-        self.message = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_message(&mut self) -> &mut ::std::string::String {
-        &mut self.message
-    }
-
-    // Take field
-    pub fn take_message(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.message, ::std::string::String::new())
-    }
 }
 
 impl ::protobuf::Message for DeleteRdataResponse {
@@ -1562,12 +1927,6 @@ impl ::protobuf::Message for DeleteRdataResponse {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
-                1 => {
-                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.code, 1, &mut self.unknown_fields)?
-                },
-                2 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.message)?;
-                },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
@@ -1580,24 +1939,12 @@ impl ::protobuf::Message for DeleteRdataResponse {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if self.code != StatusCode::Succeed {
-            my_size += ::protobuf::rt::enum_size(1, self.code);
-        }
-        if !self.message.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.message);
-        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
-        if self.code != StatusCode::Succeed {
-            os.write_enum(1, self.code.value())?;
-        }
-        if !self.message.is_empty() {
-            os.write_string(2, &self.message)?;
-        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -1639,17 +1986,7 @@ impl ::protobuf::Message for DeleteRdataResponse {
         };
         unsafe {
             descriptor.get(|| {
-                let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeEnum<StatusCode>>(
-                    "code",
-                    |m: &DeleteRdataResponse| { &m.code },
-                    |m: &mut DeleteRdataResponse| { &mut m.code },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "message",
-                    |m: &DeleteRdataResponse| { &m.message },
-                    |m: &mut DeleteRdataResponse| { &mut m.message },
-                ));
+                let fields = ::std::vec::Vec::new();
                 ::protobuf::reflect::MessageDescriptor::new::<DeleteRdataResponse>(
                     "DeleteRdataResponse",
                     fields,
@@ -1672,8 +2009,6 @@ impl ::protobuf::Message for DeleteRdataResponse {
 
 impl ::protobuf::Clear for DeleteRdataResponse {
     fn clear(&mut self) {
-        self.code = StatusCode::Succeed;
-        self.message.clear();
         self.unknown_fields.clear();
     }
 }
@@ -1694,8 +2029,8 @@ impl ::protobuf::reflect::ProtobufValue for DeleteRdataResponse {
 pub struct UpdateRdataRequest {
     // message fields
     pub zone: ::std::string::String,
-    pub old_rrsets: ::protobuf::RepeatedField<super::rrset::RRset>,
-    pub new_rrsets: ::protobuf::RepeatedField<super::rrset::RRset>,
+    pub old_rrset: ::protobuf::SingularPtrField<super::rrset::RRset>,
+    pub new_rrset: ::protobuf::SingularPtrField<super::rrset::RRset>,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -1738,65 +2073,81 @@ impl UpdateRdataRequest {
         ::std::mem::replace(&mut self.zone, ::std::string::String::new())
     }
 
-    // repeated .client.RRset old_rrsets = 2;
+    // .client.RRset old_rrset = 2;
 
 
-    pub fn get_old_rrsets(&self) -> &[super::rrset::RRset] {
-        &self.old_rrsets
+    pub fn get_old_rrset(&self) -> &super::rrset::RRset {
+        self.old_rrset.as_ref().unwrap_or_else(|| super::rrset::RRset::default_instance())
     }
-    pub fn clear_old_rrsets(&mut self) {
-        self.old_rrsets.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_old_rrsets(&mut self, v: ::protobuf::RepeatedField<super::rrset::RRset>) {
-        self.old_rrsets = v;
+    pub fn clear_old_rrset(&mut self) {
+        self.old_rrset.clear();
     }
 
-    // Mutable pointer to the field.
-    pub fn mut_old_rrsets(&mut self) -> &mut ::protobuf::RepeatedField<super::rrset::RRset> {
-        &mut self.old_rrsets
-    }
-
-    // Take field
-    pub fn take_old_rrsets(&mut self) -> ::protobuf::RepeatedField<super::rrset::RRset> {
-        ::std::mem::replace(&mut self.old_rrsets, ::protobuf::RepeatedField::new())
-    }
-
-    // repeated .client.RRset new_rrsets = 3;
-
-
-    pub fn get_new_rrsets(&self) -> &[super::rrset::RRset] {
-        &self.new_rrsets
-    }
-    pub fn clear_new_rrsets(&mut self) {
-        self.new_rrsets.clear();
+    pub fn has_old_rrset(&self) -> bool {
+        self.old_rrset.is_some()
     }
 
     // Param is passed by value, moved
-    pub fn set_new_rrsets(&mut self, v: ::protobuf::RepeatedField<super::rrset::RRset>) {
-        self.new_rrsets = v;
+    pub fn set_old_rrset(&mut self, v: super::rrset::RRset) {
+        self.old_rrset = ::protobuf::SingularPtrField::some(v);
     }
 
     // Mutable pointer to the field.
-    pub fn mut_new_rrsets(&mut self) -> &mut ::protobuf::RepeatedField<super::rrset::RRset> {
-        &mut self.new_rrsets
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_old_rrset(&mut self) -> &mut super::rrset::RRset {
+        if self.old_rrset.is_none() {
+            self.old_rrset.set_default();
+        }
+        self.old_rrset.as_mut().unwrap()
     }
 
     // Take field
-    pub fn take_new_rrsets(&mut self) -> ::protobuf::RepeatedField<super::rrset::RRset> {
-        ::std::mem::replace(&mut self.new_rrsets, ::protobuf::RepeatedField::new())
+    pub fn take_old_rrset(&mut self) -> super::rrset::RRset {
+        self.old_rrset.take().unwrap_or_else(|| super::rrset::RRset::new())
+    }
+
+    // .client.RRset new_rrset = 3;
+
+
+    pub fn get_new_rrset(&self) -> &super::rrset::RRset {
+        self.new_rrset.as_ref().unwrap_or_else(|| super::rrset::RRset::default_instance())
+    }
+    pub fn clear_new_rrset(&mut self) {
+        self.new_rrset.clear();
+    }
+
+    pub fn has_new_rrset(&self) -> bool {
+        self.new_rrset.is_some()
+    }
+
+    // Param is passed by value, moved
+    pub fn set_new_rrset(&mut self, v: super::rrset::RRset) {
+        self.new_rrset = ::protobuf::SingularPtrField::some(v);
+    }
+
+    // Mutable pointer to the field.
+    // If field is not initialized, it is initialized with default value first.
+    pub fn mut_new_rrset(&mut self) -> &mut super::rrset::RRset {
+        if self.new_rrset.is_none() {
+            self.new_rrset.set_default();
+        }
+        self.new_rrset.as_mut().unwrap()
+    }
+
+    // Take field
+    pub fn take_new_rrset(&mut self) -> super::rrset::RRset {
+        self.new_rrset.take().unwrap_or_else(|| super::rrset::RRset::new())
     }
 }
 
 impl ::protobuf::Message for UpdateRdataRequest {
     fn is_initialized(&self) -> bool {
-        for v in &self.old_rrsets {
+        for v in &self.old_rrset {
             if !v.is_initialized() {
                 return false;
             }
         };
-        for v in &self.new_rrsets {
+        for v in &self.new_rrset {
             if !v.is_initialized() {
                 return false;
             }
@@ -1812,10 +2163,10 @@ impl ::protobuf::Message for UpdateRdataRequest {
                     ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.zone)?;
                 },
                 2 => {
-                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.old_rrsets)?;
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.old_rrset)?;
                 },
                 3 => {
-                    ::protobuf::rt::read_repeated_message_into(wire_type, is, &mut self.new_rrsets)?;
+                    ::protobuf::rt::read_singular_message_into(wire_type, is, &mut self.new_rrset)?;
                 },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
@@ -1832,14 +2183,14 @@ impl ::protobuf::Message for UpdateRdataRequest {
         if !self.zone.is_empty() {
             my_size += ::protobuf::rt::string_size(1, &self.zone);
         }
-        for value in &self.old_rrsets {
-            let len = value.compute_size();
+        if let Some(ref v) = self.old_rrset.as_ref() {
+            let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-        };
-        for value in &self.new_rrsets {
-            let len = value.compute_size();
+        }
+        if let Some(ref v) = self.new_rrset.as_ref() {
+            let len = v.compute_size();
             my_size += 1 + ::protobuf::rt::compute_raw_varint32_size(len) + len;
-        };
+        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
@@ -1849,16 +2200,16 @@ impl ::protobuf::Message for UpdateRdataRequest {
         if !self.zone.is_empty() {
             os.write_string(1, &self.zone)?;
         }
-        for v in &self.old_rrsets {
+        if let Some(ref v) = self.old_rrset.as_ref() {
             os.write_tag(2, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
-        };
-        for v in &self.new_rrsets {
+        }
+        if let Some(ref v) = self.new_rrset.as_ref() {
             os.write_tag(3, ::protobuf::wire_format::WireTypeLengthDelimited)?;
             os.write_raw_varint32(v.get_cached_size())?;
             v.write_to_with_cached_sizes(os)?;
-        };
+        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -1906,15 +2257,15 @@ impl ::protobuf::Message for UpdateRdataRequest {
                     |m: &UpdateRdataRequest| { &m.zone },
                     |m: &mut UpdateRdataRequest| { &mut m.zone },
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::rrset::RRset>>(
-                    "old_rrsets",
-                    |m: &UpdateRdataRequest| { &m.old_rrsets },
-                    |m: &mut UpdateRdataRequest| { &mut m.old_rrsets },
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::rrset::RRset>>(
+                    "old_rrset",
+                    |m: &UpdateRdataRequest| { &m.old_rrset },
+                    |m: &mut UpdateRdataRequest| { &mut m.old_rrset },
                 ));
-                fields.push(::protobuf::reflect::accessor::make_repeated_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::rrset::RRset>>(
-                    "new_rrsets",
-                    |m: &UpdateRdataRequest| { &m.new_rrsets },
-                    |m: &mut UpdateRdataRequest| { &mut m.new_rrsets },
+                fields.push(::protobuf::reflect::accessor::make_singular_ptr_field_accessor::<_, ::protobuf::types::ProtobufTypeMessage<super::rrset::RRset>>(
+                    "new_rrset",
+                    |m: &UpdateRdataRequest| { &m.new_rrset },
+                    |m: &mut UpdateRdataRequest| { &mut m.new_rrset },
                 ));
                 ::protobuf::reflect::MessageDescriptor::new::<UpdateRdataRequest>(
                     "UpdateRdataRequest",
@@ -1939,8 +2290,8 @@ impl ::protobuf::Message for UpdateRdataRequest {
 impl ::protobuf::Clear for UpdateRdataRequest {
     fn clear(&mut self) {
         self.zone.clear();
-        self.old_rrsets.clear();
-        self.new_rrsets.clear();
+        self.old_rrset.clear();
+        self.new_rrset.clear();
         self.unknown_fields.clear();
     }
 }
@@ -1959,9 +2310,6 @@ impl ::protobuf::reflect::ProtobufValue for UpdateRdataRequest {
 
 #[derive(PartialEq,Clone,Default)]
 pub struct UpdateRdataResponse {
-    // message fields
-    pub code: StatusCode,
-    pub message: ::std::string::String,
     // special fields
     pub unknown_fields: ::protobuf::UnknownFields,
     pub cached_size: ::protobuf::CachedSize,
@@ -1977,47 +2325,6 @@ impl UpdateRdataResponse {
     pub fn new() -> UpdateRdataResponse {
         ::std::default::Default::default()
     }
-
-    // .client.StatusCode code = 1;
-
-
-    pub fn get_code(&self) -> StatusCode {
-        self.code
-    }
-    pub fn clear_code(&mut self) {
-        self.code = StatusCode::Succeed;
-    }
-
-    // Param is passed by value, moved
-    pub fn set_code(&mut self, v: StatusCode) {
-        self.code = v;
-    }
-
-    // string message = 2;
-
-
-    pub fn get_message(&self) -> &str {
-        &self.message
-    }
-    pub fn clear_message(&mut self) {
-        self.message.clear();
-    }
-
-    // Param is passed by value, moved
-    pub fn set_message(&mut self, v: ::std::string::String) {
-        self.message = v;
-    }
-
-    // Mutable pointer to the field.
-    // If field is not initialized, it is initialized with default value first.
-    pub fn mut_message(&mut self) -> &mut ::std::string::String {
-        &mut self.message
-    }
-
-    // Take field
-    pub fn take_message(&mut self) -> ::std::string::String {
-        ::std::mem::replace(&mut self.message, ::std::string::String::new())
-    }
 }
 
 impl ::protobuf::Message for UpdateRdataResponse {
@@ -2029,12 +2336,6 @@ impl ::protobuf::Message for UpdateRdataResponse {
         while !is.eof()? {
             let (field_number, wire_type) = is.read_tag_unpack()?;
             match field_number {
-                1 => {
-                    ::protobuf::rt::read_proto3_enum_with_unknown_fields_into(wire_type, is, &mut self.code, 1, &mut self.unknown_fields)?
-                },
-                2 => {
-                    ::protobuf::rt::read_singular_proto3_string_into(wire_type, is, &mut self.message)?;
-                },
                 _ => {
                     ::protobuf::rt::read_unknown_or_skip_group(field_number, wire_type, is, self.mut_unknown_fields())?;
                 },
@@ -2047,24 +2348,12 @@ impl ::protobuf::Message for UpdateRdataResponse {
     #[allow(unused_variables)]
     fn compute_size(&self) -> u32 {
         let mut my_size = 0;
-        if self.code != StatusCode::Succeed {
-            my_size += ::protobuf::rt::enum_size(1, self.code);
-        }
-        if !self.message.is_empty() {
-            my_size += ::protobuf::rt::string_size(2, &self.message);
-        }
         my_size += ::protobuf::rt::unknown_fields_size(self.get_unknown_fields());
         self.cached_size.set(my_size);
         my_size
     }
 
     fn write_to_with_cached_sizes(&self, os: &mut ::protobuf::CodedOutputStream) -> ::protobuf::ProtobufResult<()> {
-        if self.code != StatusCode::Succeed {
-            os.write_enum(1, self.code.value())?;
-        }
-        if !self.message.is_empty() {
-            os.write_string(2, &self.message)?;
-        }
         os.write_unknown_fields(self.get_unknown_fields())?;
         ::std::result::Result::Ok(())
     }
@@ -2106,17 +2395,7 @@ impl ::protobuf::Message for UpdateRdataResponse {
         };
         unsafe {
             descriptor.get(|| {
-                let mut fields = ::std::vec::Vec::new();
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeEnum<StatusCode>>(
-                    "code",
-                    |m: &UpdateRdataResponse| { &m.code },
-                    |m: &mut UpdateRdataResponse| { &mut m.code },
-                ));
-                fields.push(::protobuf::reflect::accessor::make_simple_field_accessor::<_, ::protobuf::types::ProtobufTypeString>(
-                    "message",
-                    |m: &UpdateRdataResponse| { &m.message },
-                    |m: &mut UpdateRdataResponse| { &mut m.message },
-                ));
+                let fields = ::std::vec::Vec::new();
                 ::protobuf::reflect::MessageDescriptor::new::<UpdateRdataResponse>(
                     "UpdateRdataResponse",
                     fields,
@@ -2139,8 +2418,6 @@ impl ::protobuf::Message for UpdateRdataResponse {
 
 impl ::protobuf::Clear for UpdateRdataResponse {
     fn clear(&mut self) {
-        self.code = StatusCode::Succeed;
-        self.message.clear();
         self.unknown_fields.clear();
     }
 }
@@ -2157,99 +2434,34 @@ impl ::protobuf::reflect::ProtobufValue for UpdateRdataResponse {
     }
 }
 
-#[derive(Clone,PartialEq,Eq,Debug,Hash)]
-pub enum StatusCode {
-    Succeed = 0,
-    Failed = 1,
-    Unauthorized = 2,
-    NotFound = 3,
-}
-
-impl ::protobuf::ProtobufEnum for StatusCode {
-    fn value(&self) -> i32 {
-        *self as i32
-    }
-
-    fn from_i32(value: i32) -> ::std::option::Option<StatusCode> {
-        match value {
-            0 => ::std::option::Option::Some(StatusCode::Succeed),
-            1 => ::std::option::Option::Some(StatusCode::Failed),
-            2 => ::std::option::Option::Some(StatusCode::Unauthorized),
-            3 => ::std::option::Option::Some(StatusCode::NotFound),
-            _ => ::std::option::Option::None
-        }
-    }
-
-    fn values() -> &'static [Self] {
-        static values: &'static [StatusCode] = &[
-            StatusCode::Succeed,
-            StatusCode::Failed,
-            StatusCode::Unauthorized,
-            StatusCode::NotFound,
-        ];
-        values
-    }
-
-    fn enum_descriptor_static() -> &'static ::protobuf::reflect::EnumDescriptor {
-        static mut descriptor: ::protobuf::lazy::Lazy<::protobuf::reflect::EnumDescriptor> = ::protobuf::lazy::Lazy {
-            lock: ::protobuf::lazy::ONCE_INIT,
-            ptr: 0 as *const ::protobuf::reflect::EnumDescriptor,
-        };
-        unsafe {
-            descriptor.get(|| {
-                ::protobuf::reflect::EnumDescriptor::new("StatusCode", file_descriptor_proto())
-            })
-        }
-    }
-}
-
-impl ::std::marker::Copy for StatusCode {
-}
-
-impl ::std::default::Default for StatusCode {
-    fn default() -> Self {
-        StatusCode::Succeed
-    }
-}
-
-impl ::protobuf::reflect::ProtobufValue for StatusCode {
-    fn as_ref(&self) -> ::protobuf::reflect::ProtobufValueRef {
-        ::protobuf::reflect::ProtobufValueRef::Enum(self.descriptor())
-    }
-}
-
 static file_descriptor_proto_data: &'static [u8] = b"\
-    \n\x1edynamic_update_interface.proto\x12\x06client\x1a\x0brrset.proto\"L\
-    \n\x0fAddRRsetRequest\x12\x12\n\x04zone\x18\x01\x20\x01(\tR\x04zone\x12%\
-    \n\x06rrsets\x18\x02\x20\x03(\x0b2\r.client.RRsetR\x06rrsets\"T\n\x10Add\
-    RRsetResponse\x12&\n\x04code\x18\x01\x20\x01(\x0e2\x12.client.StatusCode\
-    R\x04code\x12\x18\n\x07message\x18\x02\x20\x01(\tR\x07message\"?\n\x13De\
-    leteDomainRequest\x12\x12\n\x04zone\x18\x01\x20\x01(\tR\x04zone\x12\x14\
-    \n\x05names\x18\x02\x20\x03(\tR\x05names\"X\n\x14DeleteDomainResponse\
-    \x12&\n\x04code\x18\x01\x20\x01(\x0e2\x12.client.StatusCodeR\x04code\x12\
-    \x18\n\x07message\x18\x02\x20\x01(\tR\x07message\"U\n\x12DeleteRRsetRequ\
-    est\x12\x12\n\x04zone\x18\x01\x20\x01(\tR\x04zone\x12+\n\x06rrsets\x18\
-    \x02\x20\x03(\x0b2\x13.client.RRsetHeaderR\x06rrsets\"W\n\x13DeleteRRset\
-    Response\x12&\n\x04code\x18\x01\x20\x01(\x0e2\x12.client.StatusCodeR\x04\
-    code\x12\x18\n\x07message\x18\x02\x20\x01(\tR\x07message\"O\n\x12DeleteR\
-    dataRequest\x12\x12\n\x04zone\x18\x01\x20\x01(\tR\x04zone\x12%\n\x06rrse\
-    ts\x18\x02\x20\x03(\x0b2\r.client.RRsetR\x06rrsets\"W\n\x13DeleteRdataRe\
-    sponse\x12&\n\x04code\x18\x01\x20\x01(\x0e2\x12.client.StatusCodeR\x04co\
-    de\x12\x18\n\x07message\x18\x02\x20\x01(\tR\x07message\"\x84\x01\n\x12Up\
-    dateRdataRequest\x12\x12\n\x04zone\x18\x01\x20\x01(\tR\x04zone\x12,\n\no\
-    ld_rrsets\x18\x02\x20\x03(\x0b2\r.client.RRsetR\toldRrsets\x12,\n\nnew_r\
-    rsets\x18\x03\x20\x03(\x0b2\r.client.RRsetR\tnewRrsets\"W\n\x13UpdateRda\
-    taResponse\x12&\n\x04code\x18\x01\x20\x01(\x0e2\x12.client.StatusCodeR\
-    \x04code\x12\x18\n\x07message\x18\x02\x20\x01(\tR\x07message*E\n\nStatus\
-    Code\x12\x0b\n\x07Succeed\x10\0\x12\n\n\x06Failed\x10\x01\x12\x10\n\x0cU\
-    nauthorized\x10\x02\x12\x0c\n\x08NotFound\x10\x032\x84\x03\n\x16DynamicU\
-    pdateInterface\x12?\n\x08AddRRset\x12\x17.client.AddRRsetRequest\x1a\x18\
-    .client.AddRRsetResponse\"\0\x12K\n\x0cDeleteDomain\x12\x1b.client.Delet\
-    eDomainRequest\x1a\x1c.client.DeleteDomainResponse\"\0\x12H\n\x0bDeleteR\
-    Rset\x12\x1a.client.DeleteRRsetRequest\x1a\x1b.client.DeleteRRsetRespons\
-    e\"\0\x12H\n\x0bDeleteRdata\x12\x1a.client.DeleteRdataRequest\x1a\x1b.cl\
-    ient.DeleteRdataResponse\"\0\x12H\n\x0bUpdateRdata\x12\x1a.client.Update\
-    RdataRequest\x1a\x1b.client.UpdateRdataResponse\"\0b\x06proto3\
+    \n\x1edynamic_update_interface.proto\x12\x06client\x1a\x0brrset.proto\"G\
+    \n\x0eAddZoneRequest\x12\x12\n\x04zone\x18\x01\x20\x01(\tR\x04zone\x12!\
+    \n\x0czone_content\x18\x02\x20\x01(\tR\x0bzoneContent\"\x11\n\x0fAddZone\
+    Response\")\n\x11DeleteZoneRequest\x12\x14\n\x05zones\x18\x01\x20\x03(\t\
+    R\x05zones\"\x14\n\x12DeleteZoneResponse\"L\n\x0fAddRRsetRequest\x12\x12\
+    \n\x04zone\x18\x01\x20\x01(\tR\x04zone\x12%\n\x06rrsets\x18\x02\x20\x03(\
+    \x0b2\r.client.RRsetR\x06rrsets\"\x12\n\x10AddRRsetResponse\"?\n\x13Dele\
+    teDomainRequest\x12\x12\n\x04zone\x18\x01\x20\x01(\tR\x04zone\x12\x14\n\
+    \x05names\x18\x02\x20\x03(\tR\x05names\"\x16\n\x14DeleteDomainResponse\"\
+    U\n\x12DeleteRRsetRequest\x12\x12\n\x04zone\x18\x01\x20\x01(\tR\x04zone\
+    \x12+\n\x06rrsets\x18\x02\x20\x03(\x0b2\x13.client.RRsetHeaderR\x06rrset\
+    s\"\x15\n\x13DeleteRRsetResponse\"O\n\x12DeleteRdataRequest\x12\x12\n\
+    \x04zone\x18\x01\x20\x01(\tR\x04zone\x12%\n\x06rrsets\x18\x02\x20\x03(\
+    \x0b2\r.client.RRsetR\x06rrsets\"\x15\n\x13DeleteRdataResponse\"\x80\x01\
+    \n\x12UpdateRdataRequest\x12\x12\n\x04zone\x18\x01\x20\x01(\tR\x04zone\
+    \x12*\n\told_rrset\x18\x02\x20\x01(\x0b2\r.client.RRsetR\x08oldRrset\x12\
+    *\n\tnew_rrset\x18\x03\x20\x01(\x0b2\r.client.RRsetR\x08newRrset\"\x15\n\
+    \x13UpdateRdataResponse2\x89\x04\n\x16DynamicUpdateInterface\x12<\n\x07A\
+    ddZone\x12\x16.client.AddZoneRequest\x1a\x17.client.AddZoneResponse\"\0\
+    \x12E\n\nDeleteZone\x12\x19.client.DeleteZoneRequest\x1a\x1a.client.Dele\
+    teZoneResponse\"\0\x12?\n\x08AddRRset\x12\x17.client.AddRRsetRequest\x1a\
+    \x18.client.AddRRsetResponse\"\0\x12K\n\x0cDeleteDomain\x12\x1b.client.D\
+    eleteDomainRequest\x1a\x1c.client.DeleteDomainResponse\"\0\x12H\n\x0bDel\
+    eteRRset\x12\x1a.client.DeleteRRsetRequest\x1a\x1b.client.DeleteRRsetRes\
+    ponse\"\0\x12H\n\x0bDeleteRdata\x12\x1a.client.DeleteRdataRequest\x1a\
+    \x1b.client.DeleteRdataResponse\"\0\x12H\n\x0bUpdateRdata\x12\x1a.client\
+    .UpdateRdataRequest\x1a\x1b.client.UpdateRdataResponse\"\0b\x06proto3\
 ";
 
 static mut file_descriptor_proto_lazy: ::protobuf::lazy::Lazy<::protobuf::descriptor::FileDescriptorProto> = ::protobuf::lazy::Lazy {
