@@ -14,25 +14,44 @@ impl Rdataset {
         Rdataset { rrsets: Vec::new() }
     }
 
-    pub fn add_rrset(&mut self, mut rrset: RRset) -> Result<()> {
-        debug_assert!(!rrset.rdatas.is_empty());
-
-        if rrset.typ == RRType::CNAME {
-            if !self.rrsets.is_empty() {
-                return Err(DataSrcError::CNameCoExistsWithOtherRR.into());
-            }
-        } else if self.get_rrset_tuple(RRType::CNAME).is_some() {
-            return Err(DataSrcError::CNameCoExistsWithOtherRR.into());
-        }
+    pub fn add_rrset(&mut self, rrset: RRset) -> Result<()> {
+        self.validate_rrset(&rrset)?;
 
         if let Some(index) = self.get_rrset_tuple(rrset.typ) {
-            self.rrsets[index].1 = rrset.ttl;
-            //todo: remove duplicate
-            self.rrsets[index].2.append(&mut rrset.rdatas);
+            self.merge_rrset(index, rrset);
         } else {
+            if rrset.typ == RRType::CNAME && !self.rrsets.is_empty() {
+                return Err(DataSrcError::CNameCoExistsWithOtherRR.into());
+            }
+            if rrset.typ != RRType::CNAME && self.get_rrset_tuple(RRType::CNAME).is_some() {
+                return Err(DataSrcError::CNameCoExistsWithOtherRR.into());
+            }
             self.rrsets.push((rrset.typ, rrset.ttl, rrset.rdatas));
         }
         Ok(())
+    }
+
+    pub fn validate_rrset(&self, rrset: &RRset) -> Result<()> {
+        if rrset.rdatas.len() == 0 {
+            Err(DataSrcError::RRsetHasNoRdata.into())
+        } else if (rrset.typ == RRType::CNAME || rrset.typ == RRType::SOA)
+            && rrset.rdatas.len() != 1
+        {
+            Err(DataSrcError::ExclusiveRRsetHasMoreThanOneRdata.into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn merge_rrset(&mut self, index: usize, mut rrset: RRset) {
+        if rrset.typ == RRType::CNAME || rrset.typ == RRType::SOA {
+            self.rrsets[index].1 = rrset.ttl;
+            swap(&mut self.rrsets[index].2, &mut rrset.rdatas);
+        } else {
+            self.rrsets[index].1 = rrset.ttl;
+            //todo: add duplicate check
+            self.rrsets[index].2.append(&mut rrset.rdatas);
+        }
     }
 
     pub fn get_rrset(&self, name: &Name, typ: RRType) -> Option<RRset> {

@@ -16,4 +16,10 @@ pub enum DataSrcError {
 
     #[fail(display = "name {} doesn't exist", _0)]
     NameNotFound(String),
+
+    #[fail(display = "rrset has empty rdata")]
+    RRsetHasNoRdata,
+
+    #[fail(display = "cname or soa should has only one rdata")]
+    ExclusiveRRsetHasMoreThanOneRdata,
 }

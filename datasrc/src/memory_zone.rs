@@ -26,7 +26,6 @@ impl MemoryZone {
     }
 
     pub fn add_rrset(&mut self, rrset: RRset) -> Result<()> {
-        let mut debug = false;
         if !rrset.name.is_subdomain(&self.origin) {
             return Err(DataSrcError::OutOfZone.into());
         }
