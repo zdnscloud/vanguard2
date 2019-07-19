@@ -1,5 +1,5 @@
 use crate::zones::AuthZone;
-use futures::{Async, Future, Poll};
+use futures::{future, Future};
 use server::{Query, QueryService, ResponseSender, UdpStreamSender};
 use std::sync::{Arc, RwLock};
 
@@ -28,34 +28,17 @@ impl QueryService for AuthServer {
 
     fn handle_query(
         &mut self,
-        query: Query,
-        sender: UdpStreamSender,
+        mut query: Query,
+        mut sender: UdpStreamSender,
     ) -> Box<dyn Future<Item = (), Error = ()> + Send + 'static> {
-        Box::new(LookupFuture {
-            zones: self.zones.clone(),
-            query: Some(query),
-            sender: sender,
-        })
-    }
-}
-
-pub struct LookupFuture {
-    zones: Arc<RwLock<AuthZone>>,
-    query: Option<Query>,
-    sender: UdpStreamSender,
-}
-
-impl Future for LookupFuture {
-    type Item = ();
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<(), ()> {
-        let zones = self.zones.read().unwrap();
-        let mut resp = self.query.take().unwrap();
-        zones.handle_query(&mut resp.message);
-        if self.sender.send_response(resp).is_err() {
-            println!("send queue is full");
-        }
-        Ok(Async::Ready(()))
+        let zones = self.zones.clone();
+        Box::new(future::lazy(move || {
+            let zones = zones.read().unwrap();
+            zones.handle_query(&mut query.message);
+            if sender.send_response(query).is_err() {
+                println!("send queue is full");
+            }
+            future::ok::<(), ()>(())
+        }))
     }
 }
