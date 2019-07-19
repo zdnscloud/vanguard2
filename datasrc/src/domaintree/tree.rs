@@ -323,6 +323,11 @@ impl<T> RBTree<T> {
                     result.flag = FindResultFlag::PartialMatch;
                     result.node = node;
                     if node.is_callback_enabled() && callback.is_some() {
+                        println!(
+                            "---> name name is {:?}, chain is {}",
+                            node.get_name(),
+                            chain
+                        );
                         if callback.as_mut().unwrap()(
                             node,
                             chain.get_absolute_name(node.get_name()),
@@ -537,7 +542,6 @@ impl<T> RBTree<T> {
 #[cfg(test)]
 mod tests {
     use super::{FindResultFlag, NodeChain, NodePtr, RBTree};
-    use crate::domaintree::test_helper::name_from_string;
     use r53::Name;
 
     fn sample_names() -> Vec<(&'static str, i32)> {
@@ -563,7 +567,7 @@ mod tests {
     fn build_tree(data: &Vec<(&'static str, i32)>) -> RBTree<i32> {
         let mut tree = RBTree::new();
         for (k, v) in data {
-            tree.insert(name_from_string(k), Some(*v));
+            tree.insert(Name::new(k).unwrap(), Some(*v));
         }
         tree
     }
@@ -576,7 +580,7 @@ mod tests {
 
         for (n, v) in sample_names() {
             let mut node_chain = NodeChain::new(&tree);
-            let result = tree.find_node(&name_from_string(n), &mut node_chain);
+            let result = tree.find_node(&Name::new(n).unwrap(), &mut node_chain);
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             assert_eq!(result.node.get_value(), &Some(v));
         }
@@ -584,7 +588,7 @@ mod tests {
         let none_terminal = vec!["d.e.f", "w.y.d.e.f"];
         for n in &none_terminal {
             let mut node_chain = NodeChain::new(&tree);
-            let result = tree.find_node(&name_from_string(n), &mut node_chain);
+            let result = tree.find_node(&Name::new(n).unwrap(), &mut node_chain);
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             assert_eq!(result.node.get_value(), &None);
         }
@@ -596,7 +600,7 @@ mod tests {
         let mut tree = build_tree(&data);
         assert_eq!(tree.len(), 14);
         for (n, v) in data {
-            let result = tree.find(&name_from_string(n));
+            let result = tree.find(&Name::new(n).unwrap());
             assert_eq!(result.flag, FindResultFlag::ExacatMatch);
             let node = result.node;
             assert_eq!(tree.remove_node(node), Some(v));
@@ -627,7 +631,7 @@ mod tests {
             let mut tree = RBTree::new();
             for name in vec!["a", "b", "c", "d"] {
                 tree.insert(
-                    name_from_string(name),
+                    Name::new(name).unwrap(),
                     Some(NumberWrapper::new(num.clone())),
                 );
             }
@@ -640,12 +644,12 @@ mod tests {
     fn test_callback() {
         let mut tree = RBTree::new();
         for name in vec!["a", "b", "c", "d"] {
-            tree.insert(name_from_string(name), Some(10));
+            tree.insert(Name::new(name).unwrap(), Some(10));
         }
-        let (n, _) = tree.insert(name_from_string("e"), Some(20));
+        let (n, _) = tree.insert(Name::new("e").unwrap(), Some(20));
         n.set_callback(true);
 
-        tree.insert(name_from_string("b.e"), Some(30));
+        tree.insert(Name::new("b.e").unwrap(), Some(30));
         let mut num = 0;
         let callback = |n: NodePtr<u32>, name: Name, num: &mut u32| {
             assert_eq!(name.to_string(), "e.");
@@ -654,7 +658,7 @@ mod tests {
         };
         let mut node_chain = NodeChain::new(&tree);
         let result = tree.find_node_ext(
-            &name_from_string("b.e"),
+            &Name::new("b.e").unwrap(),
             &mut node_chain,
             &mut Some(callback),
             &mut num,
@@ -662,8 +666,10 @@ mod tests {
         assert_eq!(num, 20);
         assert_eq!(result.flag, FindResultFlag::ExacatMatch);
         assert_eq!(result.node.get_value(), &Some(30));
+
+        let mut node_chain = NodeChain::new(&tree);
         tree.find_node_ext(
-            &name_from_string("e"),
+            &Name::new("e").unwrap(),
             &mut node_chain,
             &mut Some(callback),
             &mut num,
@@ -676,8 +682,9 @@ mod tests {
             *num = *num + n.get_value().unwrap();
             true
         };
+        let mut node_chain = NodeChain::new(&tree);
         let result = tree.find_node_ext(
-            &name_from_string("b.e"),
+            &Name::new("b.e").unwrap(),
             &mut node_chain,
             &mut Some(callback),
             &mut num,

@@ -12,6 +12,7 @@ pub struct DynamicUpdateHandler {
     zones: Arc<RwLock<AuthZone>>,
 }
 
+//note: current implementation doesn't support transaction
 impl DynamicUpdateHandler {
     pub fn new(zones: Arc<RwLock<AuthZone>>) -> Self {
         DynamicUpdateHandler { zones }

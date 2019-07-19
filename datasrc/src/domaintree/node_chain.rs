@@ -46,16 +46,17 @@ impl<'a, T> NodeChain<'a, T> {
     }
 
     pub fn get_absolute_name(&self, child: &LabelSequence) -> Name {
-        child
-            .concat_all(
-                self.nodes[..self.level_count]
-                    .iter()
-                    .rev()
-                    .map(|n| n.get_name())
-                    .collect::<Vec<&LabelSequence>>()
-                    .as_ref(),
-            )
-            .unwrap()
+        if self.level_count == 0 {
+            child.concat_all(&[]).expect("get absolute name failed")
+        } else {
+            let mut names = [self.nodes[self.level_count - 1].get_name(); MAX_LABEL_COUNT as usize];
+            for i in 1..self.level_count {
+                names[i] = self.nodes[self.level_count - i - 1].get_name();
+            }
+            child
+                .concat_all(&names[0..self.level_count])
+                .expect("get absolute name failed")
+        }
     }
 
     pub fn top(&self) -> NodePtr<T> {
@@ -69,5 +70,36 @@ impl<'a, T> NodeChain<'a, T> {
     pub fn push(&mut self, node: NodePtr<T>) {
         self.nodes[self.level_count] = node;
         self.level_count += 1;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{NodeChain, NodePtr, RBTree};
+    use r53::{LabelSequence, Name};
+    use std::str::FromStr;
+
+    #[test]
+    fn test_get_absoulte_name() {
+        let name_seq = LabelSequence::from_str("a.b.cn.").unwrap();
+        let tree = RBTree::new();
+        let mut chain = NodeChain::new(&tree);
+        assert_eq!(
+            chain.get_absolute_name(&name_seq),
+            Name::from_str("a.b.cn").unwrap()
+        );
+
+        chain.push(NodePtr::new(
+            LabelSequence::from_str("cn.").unwrap(),
+            Some("v1"),
+        ));
+        chain.push(NodePtr::new(
+            LabelSequence::from_str("b").unwrap(),
+            Some("v1"),
+        ));
+        assert_eq!(
+            chain.get_absolute_name(&LabelSequence::from_str("a").unwrap()),
+            Name::from_str("a.b.cn").unwrap()
+        );
     }
 }
