@@ -205,5 +205,13 @@ mod tests {
         let cname = RRset::from_str(format!("{} 3600 IN CNAME {}", name, alias).as_ref()).unwrap();
         rrset.add_rrset(cname.clone()).unwrap();
         assert_eq!(rrset.get_rrset(&name, RRType::CNAME), Some(cname));
+        let result = rrset.add_rrset(build_a_rrset("a.cn", &["1.1.1.1"]));
+        assert!(result.is_err());
+        rrset.delete_rrset(RRType::CNAME).unwrap();
+        let result = rrset.add_rrset(build_a_rrset("a.cn", &["1.1.1.1"]));
+        assert!(result.is_ok());
+        let cname = RRset::from_str(format!("{} 3600 IN CNAME {}", name, alias).as_ref()).unwrap();
+        let result = rrset.add_rrset(cname.clone());
+        assert!(result.is_err());
     }
 }
