@@ -1,21 +1,11 @@
-#[macro_use]
 extern crate futures;
 extern crate tokio;
 
-mod auth_server;
-mod dynamic_server;
-mod error;
-mod proto;
-mod zones;
-
-use crate::auth_server::AuthServer;
-use crate::zones::AuthZone;
+use auth::{AuthServer, DynamicUpdateHandler};
 use clap::{App, Arg};
-use dynamic_server::DynamicUpdateHandler;
-use std::{
-    net::SocketAddr,
-    sync::{Arc, RwLock},
-};
+use forwarder::Forwarder;
+use server::UdpStream;
+use std::net::SocketAddr;
 use tokio::{net::UdpSocket, prelude::*};
 
 fn main() {
@@ -44,16 +34,16 @@ fn main() {
     let socket = UdpSocket::bind(&addr).unwrap();
     println!("Listening on: {}", socket.local_addr().unwrap());
 
-    let zones = AuthZone::new();
-    let zones = Arc::new(RwLock::new(zones));
-    let auth_server = AuthServer::new(socket, zones.clone());
+    let auth_server = AuthServer::new();
+    let forwarder = Forwarder::new("114.114.114.114:53".parse::<SocketAddr>().unwrap());
+    let dynamic_server = DynamicUpdateHandler::new(auth_server.zones());
+    let udp_stream = UdpStream::new(socket, vec![Box::new(auth_server), Box::new(forwarder)]);
 
     let addr = matches.value_of("rpc_server").unwrap_or("0.0.0.0:5555");
     let addr_and_port = addr.split(":").collect::<Vec<&str>>();
-    let dynamic_server = DynamicUpdateHandler::new(zones.clone());
     let _handler = dynamic_server.run(
         addr_and_port[0].to_string(),
         addr_and_port[1].parse().unwrap(),
     );
-    tokio::run(auth_server.map_err(|e| println!("server error = {:?}", e)));
+    tokio::run(udp_stream.map_err(|e| println!("server error = {:?}", e)));
 }

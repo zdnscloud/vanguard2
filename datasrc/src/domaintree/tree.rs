@@ -323,11 +323,6 @@ impl<T> RBTree<T> {
                     result.flag = FindResultFlag::PartialMatch;
                     result.node = node;
                     if node.is_callback_enabled() && callback.is_some() {
-                        println!(
-                            "---> name name is {:?}, chain is {}",
-                            node.get_name(),
-                            chain
-                        );
                         if callback.as_mut().unwrap()(
                             node,
                             chain.get_absolute_name(node.get_name()),

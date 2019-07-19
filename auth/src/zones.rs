@@ -46,12 +46,12 @@ impl AuthZone {
         Ok(())
     }
 
-    pub fn handle_query(&self, mut req: Message) -> Message {
+    pub fn handle_query(&self, req: &mut Message) {
         let zone = self.get_zone(&req.question.name);
         if zone.is_none() {
-            let mut builder = MessageBuilder::new(&mut req);
+            let mut builder = MessageBuilder::new(req);
             builder.make_response().rcode(Rcode::Refused).done();
-            return req;
+            return;
         }
 
         let zone = zone.unwrap();
@@ -62,7 +62,7 @@ impl AuthZone {
         );
 
         let query_type = req.question.typ;
-        let mut builder = MessageBuilder::new(&mut req);
+        let mut builder = MessageBuilder::new(req);
         builder.make_response().set_flag(HeaderFlag::AuthAnswer);
         match result.typ {
             FindResultType::CName => {
@@ -97,7 +97,6 @@ impl AuthZone {
             }
         }
         builder.done();
-        req
     }
 
     pub fn get_zone<'a>(&'a self, name: &Name) -> Option<&'a MemoryZone> {
