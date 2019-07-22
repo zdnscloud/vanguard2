@@ -10,3 +10,4 @@ grand.child.example.org. 300 IN NS ns.grand.child.example.org.
 ns.grand.child.example.org. 300 IN AAAA 2001:db8::253
 foo.wild.example.org. 300 IN A 192.0.2.3
 *.foo.example.org. 300 IN A 192.0.2.1
+txt.example.org. 300 IN TXT "vanguard2" "is awesome"
