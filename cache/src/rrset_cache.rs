@@ -1,0 +1,73 @@
+use crate::cache::{RRsetCache, RRsetTrustLevel};
+use crate::rrset_cache_entry::{RRsetEntry, RRsetEntryKey};
+use lru::LruCache;
+use r53::{Name, RData, RRClass, RRTtl, RRType, RRset};
+use std::{
+    cmp::{Eq, PartialEq},
+    hash::{Hash, Hasher},
+    time::{Duration, Instant},
+};
+
+pub struct RRsetLruCache {
+    rrsets: LruCache<RRsetEntryKey, RRsetEntry>,
+}
+
+impl RRsetLruCache {
+    pub fn new(cap: usize) -> Self {
+        RRsetLruCache {
+            rrsets: LruCache::new(cap),
+        }
+    }
+}
+
+impl RRsetCache for RRsetLruCache {
+    fn get_rrset(&mut self, name: &Name, typ: RRType) -> Option<RRset> {
+        let key = &RRsetEntryKey(name as *const Name, typ);
+        if let Some(entry) = self.rrsets.get(key) {
+            let rrset = entry.get_rrset();
+            if rrset.is_none() {
+                self.rrsets.pop(key);
+            }
+            rrset
+        } else {
+            None
+        }
+    }
+
+    fn add_rrset(&mut self, rrset: RRset, trust_level: RRsetTrustLevel) {
+        let key = &RRsetEntryKey(&rrset.name as *const Name, rrset.typ);
+        if let Some(entry) = self.rrsets.peek(key) {
+            if !entry.is_expired() && entry.trust_level > trust_level {
+                return;
+            }
+        }
+        self.rrsets.pop(key);
+        let entry = RRsetEntry::new(rrset, trust_level);
+        self.rrsets.put(entry.key(), entry);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::str::FromStr;
+    #[test]
+    fn test_rrset_cache() {
+        let mut cache = RRsetLruCache::new(2);
+
+        let rrset = RRset::from_str("www.zdns.cn 300 IN A 1.1.1.1").unwrap();
+        assert!(cache.get_rrset(&rrset.name, rrset.typ).is_none());
+        cache.add_rrset(rrset.clone(), RRsetTrustLevel::NonAuthAnswerWithAA);
+        let insert_rrset = cache.get_rrset(&rrset.name, rrset.typ).unwrap();
+        assert_eq!(insert_rrset.rdatas, rrset.rdatas);
+
+        let low_trust_level_rrset = RRset::from_str("www.zdns.cn 300 IN A 2.2.2.2").unwrap();
+        cache.add_rrset(low_trust_level_rrset.clone(), RRsetTrustLevel::Default);
+        let insert_rrset = cache.get_rrset(&rrset.name, rrset.typ).unwrap();
+        assert_eq!(insert_rrset.rdatas, rrset.rdatas);
+
+        cache.add_rrset(low_trust_level_rrset.clone(), RRsetTrustLevel::PrimNonGlue);
+        let insert_rrset = cache.get_rrset(&rrset.name, rrset.typ).unwrap();
+        assert_eq!(insert_rrset.rdatas, low_trust_level_rrset.rdatas);
+    }
+}
