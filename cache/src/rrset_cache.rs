@@ -1,15 +1,11 @@
 use crate::cache::{RRsetCache, RRsetTrustLevel};
-use crate::rrset_cache_entry::{RRsetEntry, RRsetEntryKey};
+use crate::cache_entry_key::EntryKey;
+use crate::rrset_cache_entry::RRsetEntry;
 use lru::LruCache;
-use r53::{Name, RData, RRClass, RRTtl, RRType, RRset};
-use std::{
-    cmp::{Eq, PartialEq},
-    hash::{Hash, Hasher},
-    time::{Duration, Instant},
-};
+use r53::{Name, RRType, RRset};
 
 pub struct RRsetLruCache {
-    rrsets: LruCache<RRsetEntryKey, RRsetEntry>,
+    rrsets: LruCache<EntryKey, RRsetEntry>,
 }
 
 impl RRsetLruCache {
@@ -22,7 +18,7 @@ impl RRsetLruCache {
 
 impl RRsetCache for RRsetLruCache {
     fn get_rrset(&mut self, name: &Name, typ: RRType) -> Option<RRset> {
-        let key = &RRsetEntryKey(name as *const Name, typ);
+        let key = &EntryKey(name as *const Name, typ);
         if let Some(entry) = self.rrsets.get(key) {
             let rrset = entry.get_rrset();
             if rrset.is_none() {
@@ -35,7 +31,7 @@ impl RRsetCache for RRsetLruCache {
     }
 
     fn add_rrset(&mut self, rrset: RRset, trust_level: RRsetTrustLevel) {
-        let key = &RRsetEntryKey(&rrset.name as *const Name, rrset.typ);
+        let key = &EntryKey(&rrset.name as *const Name, rrset.typ);
         if let Some(entry) = self.rrsets.peek(key) {
             if !entry.is_expired() && entry.trust_level > trust_level {
                 return;
@@ -62,7 +58,10 @@ mod tests {
         assert_eq!(insert_rrset.rdatas, rrset.rdatas);
 
         let low_trust_level_rrset = RRset::from_str("www.zdns.cn 300 IN A 2.2.2.2").unwrap();
-        cache.add_rrset(low_trust_level_rrset.clone(), RRsetTrustLevel::Default);
+        cache.add_rrset(
+            low_trust_level_rrset.clone(),
+            RRsetTrustLevel::AdditionalWithoutAA,
+        );
         let insert_rrset = cache.get_rrset(&rrset.name, rrset.typ).unwrap();
         assert_eq!(insert_rrset.rdatas, rrset.rdatas);
 

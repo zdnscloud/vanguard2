@@ -1,9 +1,7 @@
 use r53::{Message, Name, RRType, RRset};
-use std::cmp::{Eq, Ord, PartialEq};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RRsetTrustLevel {
-    Default,
     AdditionalWithoutAA,
     AuthorityWithoutAA,
     AdditionalWithAA,

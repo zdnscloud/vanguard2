@@ -15,5 +15,6 @@ r53 = { git = "https://github.com/zdnscloud/r53"}
 failure = { git = "https://github.com/zdnscloud/cement-rs", package = "failure_ext"}
 datasrc = { path = "datasrc" }
 server = { path = "server" }
+cache = { path = "cache" }
 forwarder = { path = "forwarder" }
 auth = { path = "auth" }

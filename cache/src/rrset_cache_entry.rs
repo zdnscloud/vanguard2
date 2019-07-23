@@ -1,50 +1,7 @@
 use crate::cache::RRsetTrustLevel;
+use crate::cache_entry_key::EntryKey;
 use r53::{Name, RData, RRClass, RRTtl, RRType, RRset};
-use std::{
-    cmp::{Eq, PartialEq},
-    fmt::{self, Debug},
-    hash::{Hash, Hasher},
-    time::{Duration, Instant},
-};
-
-pub struct RRsetEntryKey(pub *const Name, pub RRType);
-
-impl RRsetEntryKey {
-    pub fn new(name: Name, typ: RRType) -> Self {
-        RRsetEntryKey(Box::into_raw(Box::new(name)), typ)
-    }
-}
-
-impl Clone for RRsetEntryKey {
-    fn clone(&self) -> Self {
-        RRsetEntryKey(self.0, self.1)
-    }
-}
-
-impl Copy for RRsetEntryKey {}
-
-impl Debug for RRsetEntryKey {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        unsafe { write!(f, "{}:{}", (*self.0), self.1) }
-    }
-}
-
-impl Hash for RRsetEntryKey {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        unsafe {
-            (*self.0).hash(state);
-        }
-        state.write_u16(self.1.to_u16());
-    }
-}
-
-impl PartialEq for RRsetEntryKey {
-    fn eq(&self, other: &RRsetEntryKey) -> bool {
-        unsafe { self.1 == other.1 && (*self.0).eq(&(*other.0)) }
-    }
-}
-
-impl Eq for RRsetEntryKey {}
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Debug)]
 pub struct RRsetEntry {
@@ -71,8 +28,8 @@ impl RRsetEntry {
         }
     }
 
-    pub fn key(&self) -> RRsetEntryKey {
-        RRsetEntryKey(self.name, self.typ)
+    pub fn key(&self) -> EntryKey {
+        EntryKey(self.name, self.typ)
     }
 
     pub fn is_expired(&self) -> bool {
@@ -112,11 +69,11 @@ mod tests {
     #[test]
     fn test_rrset_entry() {
         let rrset = RRset::from_str("www.zdns.cn 300 IN A 2.2.2.2").unwrap();
-        let entry = RRsetEntry::new(rrset.clone(), RRsetTrustLevel::Default);
+        let entry = RRsetEntry::new(rrset.clone(), RRsetTrustLevel::AdditionalWithoutAA);
         let entry_key = entry.key();
         assert_eq!(
             entry_key,
-            RRsetEntryKey(
+            EntryKey(
                 &Name::from_str("www.zdns.cn").unwrap() as *const Name,
                 RRType::A,
             )
