@@ -2,7 +2,10 @@ use crate::cache::RRsetCache;
 use crate::cache_entry_key::EntryKey;
 use crate::message_util::{get_rrset_trust_level, is_negative_response};
 use crate::rrset_cache::RRsetLruCache;
-use r53::{message::SectionType, Message, MessageBuilder, Name, RRTtl, RRType, RRset};
+use r53::{
+    header_flag::HeaderFlag, message::SectionType, Message, MessageBuilder, Name, RRTtl, RRType,
+    RRset,
+};
 use std::time::{Duration, Instant};
 
 #[derive(Clone, Debug)]
@@ -98,22 +101,25 @@ impl MessageEntry {
         EntryKey(self.name, self.typ)
     }
 
-    pub fn get_message(
+    pub fn fill_message(
         &self,
+        query: &mut Message,
         positive_cache: &mut RRsetLruCache,
         negative_cache: &mut RRsetLruCache,
-    ) -> Option<Message> {
+    ) -> bool {
         if self.expire_time <= Instant::now() {
-            return None;
+            return false;
         }
 
         let rrsets = self.get_rrsets(positive_cache, negative_cache);
         if rrsets.is_none() {
-            return None;
+            return false;
         }
 
-        let mut message = unsafe { Message::with_query((*self.name).clone(), self.typ) };
-        let mut builder = MessageBuilder::new(&mut message);
+        let mut builder = MessageBuilder::new(query);
+        builder
+            .make_response()
+            .set_flag(HeaderFlag::RecursionAvailable);
         let mut iter = rrsets.unwrap().into_iter();
         for _ in 0..self.answer_rrset_count {
             builder.add_answer(iter.next().unwrap());
@@ -126,7 +132,7 @@ impl MessageEntry {
             builder.add_additional(iter.next().unwrap());
         }
         builder.done();
-        Some(message)
+        true
     }
 
     fn get_rrsets(
@@ -212,4 +218,131 @@ fn add_rrset_in_negative_response_auth_section(
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+    use r53::{edns::Edns, Rcode};
+    use std::str::FromStr;
+
+    fn build_positive_response() -> Message {
+        let mut msg = Message::with_query(Name::new("test.example.com.").unwrap(), RRType::A);
+        {
+            let mut builder = MessageBuilder::new(&mut msg);
+            builder
+                .id(1200)
+                .rcode(Rcode::NoError)
+                .set_flag(HeaderFlag::RecursionDesired)
+                .add_answer(RRset::from_str("test.example.com. 3600 IN A 192.0.2.2").unwrap())
+                .add_answer(RRset::from_str("test.example.com. 3600 IN A 192.0.2.1").unwrap())
+                .add_auth(RRset::from_str("example.com. 10 IN NS ns1.example.com.").unwrap())
+                .add_additional(RRset::from_str("ns1.example.com. 3600 IN A 2.2.2.2").unwrap())
+                .edns(Edns {
+                    versoin: 0,
+                    extened_rcode: 0,
+                    udp_size: 4096,
+                    dnssec_aware: false,
+                    options: None,
+                })
+                .done();
+        }
+        msg
+    }
+
+    fn build_negative_response() -> Message {
+        let mut msg = Message::with_query(Name::new("test.example.com.").unwrap(), RRType::A);
+        {
+            let mut builder = MessageBuilder::new(&mut msg);
+            builder
+                .id(1200)
+                .rcode(Rcode::NXDomian)
+                .set_flag(HeaderFlag::RecursionDesired)
+                .add_auth(RRset::from_str("example.com. 30 IN SOA a.gtld-servers.net. nstld.verisign-grs.com. 1563935574 1800 900 604800 86400").unwrap())
+                .edns(Edns {
+                    versoin: 0,
+                    extened_rcode: 0,
+                    udp_size: 4096,
+                    dnssec_aware: false,
+                    options: None,
+                })
+                .done();
+        }
+        msg
+    }
+    #[test]
+    fn test_positive_message() {
+        let message = build_positive_response();
+        let mut positive_cache = RRsetLruCache::new(100);
+        let mut negative_cache = RRsetLruCache::new(100);
+        let entry = MessageEntry::new(message.clone(), &mut positive_cache, &mut negative_cache);
+        assert_eq!(positive_cache.len(), 3);
+        assert_eq!(negative_cache.len(), 0);
+        assert_eq!(
+            unsafe { (*entry.name).clone() },
+            Name::new("test.example.com").unwrap()
+        );
+        assert_eq!(entry.typ, RRType::A);
+        assert_eq!(entry.answer_rrset_count, 1);
+        assert_eq!(entry.auth_rrset_count, 1);
+        assert_eq!(entry.additional_rrset_count, 1);
+        assert_eq!(entry.rrset_refs.len(), 3);
+        assert!(entry.expire_time < Instant::now().checked_add(Duration::from_secs(10)).unwrap());
+
+        let mut query = Message::with_query(Name::new("test.example.com.").unwrap(), RRType::A);
+        assert!(entry.fill_message(&mut query, &mut positive_cache, &mut negative_cache));
+        assert_eq!(query.header.qd_count, message.header.qd_count);
+        assert_eq!(query.header.an_count, message.header.an_count);
+        assert_eq!(query.header.ns_count, message.header.ns_count);
+        assert_eq!(query.header.ar_count, message.header.ar_count - 1);
+
+        for section in vec![
+            SectionType::Answer,
+            SectionType::Auth,
+            SectionType::Additional,
+        ] {
+            let gen_message_sections = query.section(section).unwrap();
+            for (i, rrset) in message.section(section).unwrap().iter().enumerate() {
+                assert_eq!(rrset.typ, gen_message_sections[i].typ);
+                assert_eq!(rrset.rdatas, gen_message_sections[i].rdatas);
+                assert_eq!(rrset.name, gen_message_sections[i].name);
+                assert!(rrset.ttl.0 > gen_message_sections[i].ttl.0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_negative_message() {
+        let message = build_negative_response();
+        let mut positive_cache = RRsetLruCache::new(100);
+        let mut negative_cache = RRsetLruCache::new(100);
+        let entry = MessageEntry::new(message.clone(), &mut positive_cache, &mut negative_cache);
+        assert_eq!(positive_cache.len(), 0);
+        assert_eq!(negative_cache.len(), 1);
+        assert_eq!(
+            unsafe { (*entry.name).clone() },
+            Name::new("test.example.com").unwrap()
+        );
+        assert_eq!(entry.typ, RRType::A);
+        assert_eq!(entry.answer_rrset_count, 0);
+        assert_eq!(entry.auth_rrset_count, 1);
+        assert_eq!(entry.additional_rrset_count, 0);
+        assert_eq!(entry.rrset_refs.len(), 1);
+        assert!(entry.expire_time < Instant::now().checked_add(Duration::from_secs(30)).unwrap());
+        assert!(entry.expire_time > Instant::now().checked_add(Duration::from_secs(20)).unwrap());
+
+        let mut query = Message::with_query(Name::new("test.example.com.").unwrap(), RRType::A);
+        assert!(entry.fill_message(&mut query, &mut positive_cache, &mut negative_cache));
+        assert_eq!(query.header.qd_count, message.header.qd_count);
+        assert_eq!(query.header.an_count, message.header.an_count);
+        assert_eq!(query.header.ns_count, message.header.ns_count);
+        assert_eq!(query.header.ar_count, message.header.ar_count - 1);
+
+        for section in vec![SectionType::Auth] {
+            let gen_message_sections = query.section(section).unwrap();
+            for (i, rrset) in message.section(section).unwrap().iter().enumerate() {
+                assert_eq!(rrset.typ, gen_message_sections[i].typ);
+                assert_eq!(rrset.rdatas, gen_message_sections[i].rdatas);
+                assert_eq!(rrset.name, gen_message_sections[i].name);
+                assert!(rrset.ttl.0 > gen_message_sections[i].ttl.0);
+            }
+        }
+    }
+}

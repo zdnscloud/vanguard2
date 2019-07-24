@@ -17,6 +17,10 @@ impl RRsetLruCache {
 }
 
 impl RRsetCache for RRsetLruCache {
+    fn len(&self) -> usize {
+        self.rrsets.len()
+    }
+
     fn get_rrset(&mut self, name: &Name, typ: RRType) -> Option<RRset> {
         let key = &EntryKey(name as *const Name, typ);
         if let Some(entry) = self.rrsets.get(key) {
@@ -68,5 +72,18 @@ mod tests {
         cache.add_rrset(low_trust_level_rrset.clone(), RRsetTrustLevel::PrimNonGlue);
         let insert_rrset = cache.get_rrset(&rrset.name, rrset.typ).unwrap();
         assert_eq!(insert_rrset.rdatas, low_trust_level_rrset.rdatas);
+        assert_eq!(cache.len(), 1);
+
+        let rrset = RRset::from_str("www1.zdns.cn 300 IN A 1.1.1.1").unwrap();
+        cache.add_rrset(rrset.clone(), RRsetTrustLevel::NonAuthAnswerWithAA);
+        let rrset = RRset::from_str("www2.zdns.cn 300 IN A 1.1.1.1").unwrap();
+        cache.add_rrset(rrset.clone(), RRsetTrustLevel::NonAuthAnswerWithAA);
+        assert_eq!(cache.len(), 2);
+        assert!(cache
+            .get_rrset(&Name::new("www.zdns.cn").unwrap(), RRType::A)
+            .is_none());
+        assert!(cache
+            .get_rrset(&Name::new("www1.zdns.cn").unwrap(), RRType::A)
+            .is_some());
     }
 }

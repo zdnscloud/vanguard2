@@ -14,11 +14,13 @@ pub enum RRsetTrustLevel {
 }
 
 pub trait RRsetCache {
+    fn len(&self) -> usize;
     fn get_rrset(&mut self, name_and_type: &Name, typ: RRType) -> Option<RRset>;
     fn add_rrset(&mut self, rrset: RRset, trust_level: RRsetTrustLevel);
 }
 
 pub trait MessageCache {
-    fn get_message(&mut self, name: &Name, typ: RRType) -> Option<Message>;
+    fn len(&self) -> usize;
+    fn gen_response(&mut self, query: &mut Message) -> bool;
     fn add_message(&mut self, message: Message);
 }
