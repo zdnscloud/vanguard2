@@ -1,5 +1,5 @@
 use crate::cache::RRsetCache;
-use crate::cache_entry_key::EntryKey;
+use crate::entry_key::EntryKey;
 use crate::message_util::{get_rrset_trust_level, is_negative_response};
 use crate::rrset_cache::RRsetLruCache;
 use r53::{
@@ -177,6 +177,7 @@ fn add_rrset_in_section(
     min_ttl: &mut RRTtl,
 ) -> Vec<RRsetRef> {
     let mut refs = Vec::with_capacity(rrsets.len());
+    let trust_level = get_rrset_trust_level(message, section);
     for rrset in rrsets.into_iter() {
         refs.push(RRsetRef {
             name: rrset.name.clone(),
@@ -186,7 +187,6 @@ fn add_rrset_in_section(
         if rrset.ttl.0 < min_ttl.0 {
             *min_ttl = rrset.ttl;
         }
-        let trust_level = get_rrset_trust_level(message, &rrset, section);
         positive_cache.add_rrset(rrset, trust_level);
     }
     refs
@@ -200,6 +200,7 @@ fn add_rrset_in_negative_response_auth_section(
     min_ttl: &mut RRTtl,
 ) -> Vec<RRsetRef> {
     let mut refs = Vec::with_capacity(rrsets.len());
+    let trust_level = get_rrset_trust_level(message, SectionType::Auth);
     for rrset in rrsets.into_iter() {
         refs.push(RRsetRef {
             name: rrset.name.clone(),
@@ -209,7 +210,6 @@ fn add_rrset_in_negative_response_auth_section(
         if rrset.ttl.0 < min_ttl.0 {
             *min_ttl = rrset.ttl;
         }
-        let trust_level = get_rrset_trust_level(message, &rrset, SectionType::Auth);
         if rrset.typ == RRType::SOA {
             negative_cache.add_rrset(rrset, trust_level);
         } else {

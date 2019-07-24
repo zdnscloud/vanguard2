@@ -1,5 +1,5 @@
 use crate::cache::MessageCache;
-use crate::cache_entry_key::EntryKey;
+use crate::entry_key::EntryKey;
 use crate::message_cache_entry::MessageEntry;
 use crate::message_util::can_message_be_cached;
 use crate::rrset_cache::RRsetLruCache;

@@ -42,11 +42,12 @@ impl QueryHandler for Resolver {
                         }
                     })
                 })
-                .or_else(move |query| forwarder.handle_query(query.0))
-                .map(move |response| {
-                    let mut write_cache = write_cache.lock().unwrap();
-                    write_cache.add_message(response.0.message.clone());
-                    response
+                .or_else(move |query| {
+                    forwarder.handle_query(query.0).map(move |response| {
+                        let mut write_cache = write_cache.lock().unwrap();
+                        write_cache.add_message(response.0.message.clone());
+                        response
+                    })
                 }),
         )
     }

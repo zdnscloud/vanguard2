@@ -1,5 +1,5 @@
 use crate::cache::{RRsetCache, RRsetTrustLevel};
-use crate::cache_entry_key::EntryKey;
+use crate::entry_key::EntryKey;
 use crate::rrset_cache_entry::RRsetEntry;
 use lru::LruCache;
 use r53::{Name, RRType, RRset};

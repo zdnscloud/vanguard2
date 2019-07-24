@@ -10,12 +10,6 @@ pub struct EntryKey(pub *const Name, pub RRType);
 
 unsafe impl Send for EntryKey {}
 
-impl EntryKey {
-    pub fn new(name: Name, typ: RRType) -> Self {
-        EntryKey(Box::into_raw(Box::new(name)), typ)
-    }
-}
-
 impl Clone for EntryKey {
     fn clone(&self) -> Self {
         EntryKey(self.0, self.1)
