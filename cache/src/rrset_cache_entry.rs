@@ -12,6 +12,8 @@ pub struct RRsetEntry {
     expire_time: Instant,
 }
 
+unsafe impl Send for RRsetEntry {}
+
 impl RRsetEntry {
     pub fn new(rrset: RRset, trust_level: RRsetTrustLevel) -> Self {
         let expire_time = Instant::now()

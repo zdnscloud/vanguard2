@@ -1,4 +1,4 @@
-use crate::handler::{Query, QueryService, ResponseSender};
+use crate::handler::{Query, QueryHandler};
 use futures::{
     stream::{Fuse, Peekable, Stream},
     sync::mpsc::{channel, Receiver, Sender},
@@ -8,23 +8,20 @@ use r53::{Message, MessageRender};
 use std::io;
 use tokio::{executor::spawn, net::UdpSocket};
 
-pub struct UdpStream {
+pub struct UdpStream<S: QueryHandler> {
     socket: UdpSocket,
     sender: Sender<Query>,
-    services: Vec<Box<dyn QueryService<ResponseSender = UdpStreamSender>>>,
+    handler: S,
     response_ch: Peekable<Fuse<Receiver<Query>>>,
 }
 
-impl UdpStream {
-    pub fn new(
-        socket: UdpSocket,
-        services: Vec<Box<dyn QueryService<ResponseSender = UdpStreamSender>>>,
-    ) -> Self {
+impl<S: QueryHandler> UdpStream<S> {
+    pub fn new(socket: UdpSocket, handler: S) -> Self {
         let (sender, response_ch) = channel(1024);
         UdpStream {
             socket,
             sender,
-            services,
+            handler,
             response_ch: response_ch.fuse().peekable(),
         }
     }
@@ -50,7 +47,7 @@ impl UdpStream {
     }
 }
 
-impl Future for UdpStream {
+impl<S: QueryHandler> Future for UdpStream<S> {
     type Item = ();
     type Error = io::Error;
 
@@ -61,13 +58,19 @@ impl Future for UdpStream {
             try_ready!(self.send_all_response(&mut render));
             let (size, src) = try_ready!(self.socket.poll_recv_from(&mut buf));
             let query = Query::new(Message::from_wire(&buf[..size]).unwrap(), src);
-            for s in &mut self.services {
-                if s.is_capable(&query) {
-                    let sender = UdpStreamSender::new(self.sender.clone());
-                    spawn(s.handle_query(query, sender));
-                    break;
-                }
-            }
+            let mut sender = UdpStreamSender::new(self.sender.clone());
+            spawn(
+                self.handler
+                    .handle_query(query)
+                    .map(move |response| {
+                        if let Err(e) = sender.send_response(response.0) {
+                            println!("send response get err {}", e);
+                        }
+                    })
+                    .map_err(|err| {
+                        println!("query {:?} is dropped", err.0);
+                    }),
+            );
         }
     }
 }
@@ -79,9 +82,7 @@ impl UdpStreamSender {
     fn new(sender: Sender<Query>) -> Self {
         UdpStreamSender(sender)
     }
-}
 
-impl ResponseSender for UdpStreamSender {
     fn send_response(&mut self, response: Query) -> io::Result<()> {
         self.0
             .try_send(response)

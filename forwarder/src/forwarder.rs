@@ -1,10 +1,11 @@
 use futures::Future;
 use r53::{Message, MessageRender};
-use server::{Query, QueryService, ResponseSender, UdpStreamSender};
+use server::{Done, Failed, Query};
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::{net::UdpSocket, util::FutureExt};
 
+#[derive(Clone)]
 pub struct Forwarder {
     target: SocketAddr,
 }
@@ -13,35 +14,26 @@ impl Forwarder {
     pub fn new(target: SocketAddr) -> Self {
         Forwarder { target: target }
     }
-}
 
-impl QueryService for Forwarder {
-    type ResponseSender = UdpStreamSender;
-    fn is_capable(&self, _query: &Query) -> bool {
-        true
-    }
-
-    fn handle_query(
+    pub fn handle_query(
         &mut self,
-        mut query: Query,
-        mut sender: UdpStreamSender,
-    ) -> Box<dyn Future<Item = (), Error = ()> + Send + 'static> {
+        query: Query,
+    ) -> impl Future<Item = Done, Error = Failed> + Send + 'static {
         let mut render = MessageRender::new();
         query.message.rend(&mut render);
+        let sender = query.client;
         let socket = UdpSocket::bind(&("0.0.0.0:0".parse::<SocketAddr>().unwrap())).unwrap();
-        Box::new(
-            socket
-                .send_dgram(render.take_data(), &self.target)
-                .and_then(|(socket, _)| socket.recv_dgram(vec![0; 1024]))
-                .timeout(Duration::from_secs(3))
-                .map_err(|_| println!("forward timedOut"))
-                .map(move |(_, buf, size, _)| {
-                    let resp = Message::from_wire(&buf[..size]).unwrap();
-                    query.message = resp;
-                    if sender.send_response(query).is_err() {
-                        println!("send queue is full");
-                    }
-                }),
-        )
+        socket
+            .send_dgram(render.take_data(), &self.target)
+            .and_then(|(socket, _)| socket.recv_dgram(vec![0; 1024]))
+            .timeout(Duration::from_secs(3))
+            .map_err(|_| {
+                println!("forward timedOut");
+                Failed(query)
+            })
+            .map(move |(_, buf, size, _)| {
+                let resp = Message::from_wire(&buf[..size]).unwrap();
+                Done(Query::new(resp, sender))
+            })
     }
 }

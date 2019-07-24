@@ -8,6 +8,8 @@ use std::{
 //used as key for message and rrset cache search
 pub struct EntryKey(pub *const Name, pub RRType);
 
+unsafe impl Send for EntryKey {}
+
 impl EntryKey {
     pub fn new(name: Name, typ: RRType) -> Self {
         EntryKey(Box::into_raw(Box::new(name)), typ)

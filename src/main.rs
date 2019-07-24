@@ -1,5 +1,6 @@
 extern crate futures;
 extern crate tokio;
+mod resolver;
 
 use auth::{AuthServer, DynamicUpdateHandler};
 use clap::{App, Arg};
@@ -37,7 +38,8 @@ fn main() {
     let auth_server = AuthServer::new();
     let forwarder = Forwarder::new("114.114.114.114:53".parse::<SocketAddr>().unwrap());
     let dynamic_server = DynamicUpdateHandler::new(auth_server.zones());
-    let udp_stream = UdpStream::new(socket, vec![Box::new(auth_server), Box::new(forwarder)]);
+    let resolver = resolver::Resolver::new(auth_server, forwarder);
+    let udp_stream = UdpStream::new(socket, resolver);
 
     let addr = matches.value_of("rpc_server").unwrap_or("0.0.0.0:5555");
     let addr_and_port = addr.split(":").collect::<Vec<&str>>();

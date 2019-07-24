@@ -26,6 +26,8 @@ pub struct MessageEntry {
     expire_time: Instant,
 }
 
+unsafe impl Send for MessageEntry {}
+
 impl MessageEntry {
     pub fn new(
         mut message: Message,
