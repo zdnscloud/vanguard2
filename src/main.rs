@@ -26,6 +26,13 @@ fn main() {
                 .required(false)
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("forwarder")
+                .help("dns recursive server address to forward request")
+                .long("forwarder")
+                .required(false)
+                .takes_value(true),
+        )
         .get_matches();
 
     let addr = matches
@@ -37,7 +44,10 @@ fn main() {
     println!("Listening on: {}", socket.local_addr().unwrap());
 
     let auth_server = AuthServer::new();
-    let forwarder = Forwarder::new("114.114.114.114:53".parse::<SocketAddr>().unwrap());
+    let addr = matches
+        .value_of("forwarder")
+        .unwrap_or("114.114.114.114:53");
+    let forwarder = Forwarder::new(addr.parse::<SocketAddr>().unwrap());
     let dynamic_server = DynamicUpdateHandler::new(auth_server.zones());
     let resolver = resolver::Resolver::new(auth_server, forwarder, MessageLruCache::new(0));
     let udp_stream = UdpStream::new(socket, resolver);
