@@ -23,11 +23,13 @@ impl AuthServer {
         mut query: Query,
     ) -> impl Future<Item = Done, Error = Failed> + Send + 'static {
         let zones = self.zones.clone();
-        let zones = zones.read().unwrap();
-        if zones.handle_query(&mut query.message) {
-            future::ok(Done(query))
-        } else {
-            future::err(Failed(query))
-        }
+        future::lazy(move || {
+            let zones = zones.read().unwrap();
+            if zones.handle_query(&mut query.message) {
+                future::ok(Done(query))
+            } else {
+                future::err(Failed(query))
+            }
+        })
     }
 }
