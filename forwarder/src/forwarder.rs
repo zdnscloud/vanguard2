@@ -1,9 +1,11 @@
-use futures::Future;
+use futures::{future, Future};
 use r53::{Message, MessageRender};
 use server::{Done, Failed, Query};
-use std::net::SocketAddr;
-use std::time::Duration;
+use std::{io, net::SocketAddr, time::Duration};
 use tokio::{net::UdpSocket, util::FutureExt};
+
+const DEFAULT_RECV_TIMEOUT: Duration = Duration::from_secs(3); //3 secs
+const DEFAULT_RECV_BUF_SIZE: usize = 1024;
 
 #[derive(Clone)]
 pub struct Forwarder {
@@ -25,15 +27,18 @@ impl Forwarder {
         let socket = UdpSocket::bind(&("0.0.0.0:0".parse::<SocketAddr>().unwrap())).unwrap();
         socket
             .send_dgram(render.take_data(), &self.target)
-            .and_then(|(socket, _)| socket.recv_dgram(vec![0; 1024]))
-            .timeout(Duration::from_secs(3))
-            .map_err(|_| {
+            .and_then(|(socket, _)| socket.recv_dgram(vec![0; DEFAULT_RECV_BUF_SIZE]))
+            .and_then(move |(_, buf, size, _)| {
+                if let Ok(resp) = Message::from_wire(&buf[..size]) {
+                    future::ok(Done(Query::new(resp, sender)))
+                } else {
+                    future::err(io::Error::new(io::ErrorKind::Other, "invalid response"))
+                }
+            })
+            .timeout(DEFAULT_RECV_TIMEOUT)
+            .map_err(move |_| {
                 println!("forward timedOut");
                 Failed(query)
-            })
-            .map(move |(_, buf, size, _)| {
-                let resp = Message::from_wire(&buf[..size]).unwrap();
-                Done(Query::new(resp, sender))
             })
     }
 }

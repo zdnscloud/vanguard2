@@ -57,7 +57,12 @@ impl<S: QueryHandler> Future for UdpStream<S> {
         loop {
             try_ready!(self.send_all_response(&mut render));
             let (size, src) = try_ready!(self.socket.poll_recv_from(&mut buf));
-            let query = Query::new(Message::from_wire(&buf[..size]).unwrap(), src);
+            let query = Message::from_wire(&buf[..size]);
+            if query.is_err() {
+                continue;
+            }
+
+            let query = Query::new(query.unwrap(), src);
             let mut sender = UdpStreamSender::new(self.sender.clone());
             spawn(
                 self.handler
