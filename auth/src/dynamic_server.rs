@@ -1,6 +1,7 @@
 use crate::error::AuthError;
 use crate::proto::{self, dynamic_update_interface, dynamic_update_interface_grpc};
 use crate::zones::AuthZone;
+use datasrc::ZoneUpdater;
 use failure::Result;
 use grpc_helpers::provide_grpc_response;
 use grpc_helpers::{spawn_service_thread, ServerHandle};

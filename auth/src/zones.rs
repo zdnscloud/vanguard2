@@ -1,11 +1,10 @@
 use crate::error::AuthError;
 use datasrc::{
-    zone::FindResult, zone::ZoneFinder, FindOption, FindResultFlag, FindResultType, MemoryZone,
-    RBTree,
+    load_zone, zone::FindResult, zone::ZoneFinder, FindOption, FindResultFlag, FindResultType,
+    MemoryZone, RBTree,
 };
 use failure::Result;
-use r53::{HeaderFlag, Message, MessageBuilder, Name, RData, RRType, RRset, Rcode};
-use std::str::FromStr;
+use r53::{HeaderFlag, Message, MessageBuilder, Name, RRType, Rcode};
 
 pub struct AuthZone {
     zones: RBTree<MemoryZone>,
@@ -23,15 +22,7 @@ impl AuthZone {
             return Err(AuthError::DuplicateZone(name.to_string()).into());
         }
 
-        let mut zone = MemoryZone::new(name.clone());
-        for line in zone_content.lines() {
-            let line = line.trim();
-            if line.is_empty() {
-                continue;
-            }
-            let rrset = RRset::from_str(line)?;
-            zone.add_rrset(rrset)?;
-        }
+        let zone = load_zone(name.clone(), zone_content)?;
         self.zones.insert(name, Some(zone));
         Ok(())
     }

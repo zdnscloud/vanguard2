@@ -1,27 +1,27 @@
 use auth::AuthServer;
-use cache::{MessageCache, MessageLruCache};
+use cache::MessageCache;
 use forwarder::Forwarder;
 use futures::{future, Future};
 use server::{Done, Failed, Query, QueryHandler};
 use std::sync::{Arc, Mutex};
 
-pub struct Resolver {
+pub struct Resolver<T: MessageCache> {
     auth: AuthServer,
     forwarder: Forwarder,
-    message_cache: Arc<Mutex<MessageLruCache>>,
+    message_cache: Arc<Mutex<T>>,
 }
 
-impl Resolver {
-    pub fn new(auth: AuthServer, forwarder: Forwarder) -> Self {
+impl<T: MessageCache> Resolver<T> {
+    pub fn new(auth: AuthServer, forwarder: Forwarder, cache: T) -> Self {
         Resolver {
             auth,
             forwarder,
-            message_cache: Arc::new(Mutex::new(MessageLruCache::new(0))),
+            message_cache: Arc::new(Mutex::new(cache)),
         }
     }
 }
 
-impl QueryHandler for Resolver {
+impl<T: MessageCache + Send + 'static> QueryHandler for Resolver<T> {
     fn handle_query(
         &mut self,
         query: Query,

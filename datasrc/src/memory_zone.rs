@@ -5,7 +5,7 @@ use crate::domaintree::{
 };
 use crate::error::DataSrcError;
 use crate::rdataset::Rdataset;
-use crate::zone::{FindOption, FindResult, FindResultType, ZoneFinder};
+use crate::zone::{FindOption, FindResult, FindResultType, ZoneFinder, ZoneUpdater};
 use failure::Result;
 use r53::{LabelSequence, Name, NameRelation, RData, RRType, RRset};
 use std::mem::swap;
@@ -33,8 +33,10 @@ impl MemoryZone {
             data,
         }
     }
+}
 
-    pub fn add_rrset(&mut self, rrset: RRset) -> Result<()> {
+impl ZoneUpdater for MemoryZone {
+    fn add_rrset(&mut self, rrset: RRset) -> Result<()> {
         if !rrset.name.is_subdomain(&self.origin) {
             return Err(DataSrcError::OutOfZone.into());
         }
@@ -74,7 +76,7 @@ impl MemoryZone {
         Ok(())
     }
 
-    pub fn delete_rrset(&mut self, name: &Name, typ: RRType) -> Result<()> {
+    fn delete_rrset(&mut self, name: &Name, typ: RRType) -> Result<()> {
         if !name.is_subdomain(&self.origin) {
             return Err(DataSrcError::OutOfZone.into());
         }
@@ -105,7 +107,7 @@ impl MemoryZone {
         }
     }
 
-    pub fn delete_rdata(&mut self, rrset: &RRset) -> Result<()> {
+    fn delete_rdata(&mut self, rrset: &RRset) -> Result<()> {
         if !rrset.name.is_subdomain(&self.origin) {
             return Err(DataSrcError::OutOfZone.into());
         }
@@ -131,7 +133,7 @@ impl MemoryZone {
         }
     }
 
-    pub fn update_rdata(&mut self, old_rrset: &RRset, new_rrset: RRset) -> Result<()> {
+    fn update_rdata(&mut self, old_rrset: &RRset, new_rrset: RRset) -> Result<()> {
         if !old_rrset.name.is_subdomain(&self.origin) {
             return Err(DataSrcError::OutOfZone.into());
         }
@@ -149,7 +151,7 @@ impl MemoryZone {
         }
     }
 
-    pub fn delete_domain(&mut self, name: &Name) -> Result<()> {
+    fn delete_domain(&mut self, name: &Name) -> Result<()> {
         if !name.is_subdomain(&self.origin) {
             return Err(DataSrcError::OutOfZone.into());
         }
