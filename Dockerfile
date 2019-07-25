@@ -1,24 +1,23 @@
 FROM rust:1.36.0 as build
 
-# create a new empty shell project
-#RUN USER=root cargo new --bin vanguard2
+RUN echo "deb http://deb.debian.org/debian stretch-backports main" > /etc/apt/sources.list.d/backports.list \
+    && apt-get update && apt-get install -y protobuf-compiler/stretch-backports cmake golang \
+    && apt-get clean && rm -r /var/lib/apt/lists/*
+
 WORKDIR /vanguard2
 
-# copy over your manifests
-COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 COPY ./auth ./auth
 COPY ./datasrc ./datasrc
+COPY ./cache ./cache
+COPY ./forwarder ./forwarder
+COPY ./server ./server
+COPY ./src ./src
 
-# this build step will cache your dependencies
 RUN cargo build --release
 
-# our final base
+
 FROM pingcap/alpine-glibc
-
-# copy the build artifact from the build stage
-COPY --from=build /vanguard2/target/release/auth /auth
-
+COPY --from=build /vanguard2/target/release/vanguard2 /vanguard2
 EXPOSE 53/udp
-# set the startup command to run your binary
-ENTRYPOINT ["/auth"]
+ENTRYPOINT ["/vanguard2"]
