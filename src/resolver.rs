@@ -33,14 +33,12 @@ impl<T: MessageCache + Send + 'static> QueryHandler for Resolver<T> {
             self.auth
                 .handle_query(query)
                 .or_else(move |mut query| {
-                    future::lazy(move || {
-                        let mut read_cache = read_cache.lock().unwrap();
-                        if read_cache.gen_response(&mut query.0.message) {
-                            future::ok(Done(query.0))
-                        } else {
-                            future::err(Failed(query.0))
-                        }
-                    })
+                    let mut read_cache = read_cache.lock().unwrap();
+                    if read_cache.gen_response(&mut query.0.message) {
+                        future::ok(Done(query.0))
+                    } else {
+                        future::err(Failed(query.0))
+                    }
                 })
                 .or_else(move |query| {
                     forwarder.handle_query(query.0).map(move |response| {
