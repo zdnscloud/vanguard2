@@ -59,8 +59,14 @@ impl<'a, T> NodeChain<'a, T> {
         }
     }
 
+    #[inline]
     pub fn top(&self) -> NodePtr<T> {
         self.nodes[self.level_count - 1]
+    }
+
+    #[inline]
+    pub fn bottom(&self) -> NodePtr<T> {
+        self.nodes[0]
     }
 
     fn pop(&mut self) {

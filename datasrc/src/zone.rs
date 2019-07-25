@@ -21,6 +21,8 @@ pub trait FindResult {
     fn get_rrset(&self) -> &Option<RRset>;
     fn get_additional(&self) -> Vec<RRset>;
     fn get_address(&self, name: &Name) -> Vec<RRset>;
+    fn get_apex_ns_and_glue(&self) -> (RRset, Vec<RRset>);
+    fn get_apex_soa(&self) -> RRset;
 }
 
 pub trait ZoneFinder<'a> {

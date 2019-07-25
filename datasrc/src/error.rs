@@ -22,4 +22,13 @@ pub enum DataSrcError {
 
     #[fail(display = "cname or soa should has only one rdata")]
     ExclusiveRRsetHasMoreThanOneRdata,
+
+    #[fail(display = "zone origin isn't allowed to delete")]
+    ZoneOrginNotAllowToDelete,
+
+    #[fail(display = "zone has no soa record")]
+    ZoneShortOfSOA,
+
+    #[fail(display = "zone has no ns record")]
+    ZoneShortOfNS,
 }

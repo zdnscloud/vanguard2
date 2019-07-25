@@ -74,7 +74,7 @@ impl AuthZone {
                 }
                 builder.add_answer(result.rrset.take().unwrap());
                 if query_type != RRType::NS {
-                    let (auth, additional) = get_auth_and_additional(zone);
+                    let (auth, additional) = result.get_apex_ns_and_glue();
                     builder.add_auth(auth);
                     for rrset in additional {
                         builder.add_additional(rrset);
@@ -90,10 +90,14 @@ impl AuthZone {
                     .add_auth(result.rrset.take().unwrap());
             }
             FindResultType::NXDomain => {
-                builder.rcode(Rcode::NXDomian).add_auth(get_soa(zone));
+                builder
+                    .rcode(Rcode::NXDomian)
+                    .add_auth(result.get_apex_soa());
             }
             FindResultType::NXRRset => {
-                builder.rcode(Rcode::NXRRset).add_auth(get_soa(zone));
+                builder
+                    .rcode(Rcode::NXRRset)
+                    .add_auth(result.get_apex_soa());
             }
         }
         builder.done();
@@ -113,21 +117,4 @@ impl AuthZone {
             None
         }
     }
-}
-
-fn get_auth_and_additional(zone: &MemoryZone) -> (RRset, Vec<RRset>) {
-    let mut address = Vec::new();
-    let mut result = zone.find(zone.get_origin(), RRType::NS, FindOption::FollowZoneCut);
-    let ns = result.rrset.take().unwrap();
-    for rdata in &ns.rdatas {
-        if let RData::NS(ns) = rdata {
-            address.append(&mut result.get_address(&ns.name));
-        }
-    }
-    (ns, address)
-}
-
-fn get_soa(zone: &MemoryZone) -> RRset {
-    let mut result = zone.find(zone.get_origin(), RRType::SOA, FindOption::FollowZoneCut);
-    result.rrset.take().unwrap()
 }

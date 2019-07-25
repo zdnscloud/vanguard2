@@ -14,14 +14,23 @@ type ZoneData = RBTree<Rdataset>;
 
 pub struct MemoryZone {
     origin: Name,
+    //root node is buffered to accelerate apex
+    //soa and ns lookup
+    root_node: NodePtr<Rdataset>,
     pub data: ZoneData,
 }
 
 impl MemoryZone {
     pub fn new(name: Name) -> Self {
+        let mut data = ZoneData::new();
+        //during node rotate in rbtree, root node is the parent node
+        //which has down pointer point to the rest zone data, so root
+        //node itself won't be changed
+        let (root_node, _) = data.insert(name.clone(), None);
         MemoryZone {
             origin: name,
-            data: ZoneData::new(),
+            root_node,
+            data,
         }
     }
 
@@ -70,13 +79,23 @@ impl MemoryZone {
             return Err(DataSrcError::OutOfZone.into());
         }
 
+        if typ == RRType::SOA {
+            return Err(DataSrcError::ZoneShortOfSOA.into());
+        }
+
+        if name.eq(&self.origin) && typ == RRType::NS {
+            return Err(DataSrcError::ZoneShortOfNS.into());
+        }
+
         let mut find_result = self.data.find(&name);
         if find_result.flag == FindResultFlag::ExacatMatch {
             if let Some(rdataset) = find_result.node.get_value_mut().as_mut() {
                 rdataset.delete_rrset(typ)?;
                 if rdataset.is_empty() {
                     let node = find_result.node;
-                    self.data.remove_node(node);
+                    if node != self.root_node {
+                        self.data.remove_node(node);
+                    }
                 }
             }
             //ignore if rrset doesn't exists
@@ -89,6 +108,10 @@ impl MemoryZone {
     pub fn delete_rdata(&mut self, rrset: &RRset) -> Result<()> {
         if !rrset.name.is_subdomain(&self.origin) {
             return Err(DataSrcError::OutOfZone.into());
+        }
+
+        if rrset.typ == RRType::SOA {
+            return Err(DataSrcError::ZoneShortOfSOA.into());
         }
 
         let mut find_result = self.data.find(&rrset.name);
@@ -129,6 +152,10 @@ impl MemoryZone {
     pub fn delete_domain(&mut self, name: &Name) -> Result<()> {
         if !name.is_subdomain(&self.origin) {
             return Err(DataSrcError::OutOfZone.into());
+        }
+
+        if name.eq(&self.origin) {
+            return Err(DataSrcError::ZoneOrginNotAllowToDelete.into());
         }
 
         let find_result = self.data.find(&name);
@@ -224,6 +251,34 @@ impl<'a> FindResult for MemoryZoneFindResult<'a> {
             }
         }
         rrsets
+    }
+
+    fn get_apex_ns_and_glue(&self) -> (RRset, Vec<RRset>) {
+        let ns = self
+            .zone
+            .root_node
+            .get_value()
+            .as_ref()
+            .unwrap()
+            .get_rrset(&self.zone.origin, RRType::NS)
+            .unwrap();
+        let mut addresses = Vec::with_capacity(ns.rdatas.len());
+        for rdata in &ns.rdatas {
+            if let RData::NS(ns) = rdata {
+                addresses.append(&mut self.get_address(&ns.name));
+            }
+        }
+        (ns, addresses)
+    }
+
+    fn get_apex_soa(&self) -> RRset {
+        self.zone
+            .root_node
+            .get_value()
+            .as_ref()
+            .unwrap()
+            .get_rrset(&self.zone.origin, RRType::SOA)
+            .unwrap()
     }
 }
 
