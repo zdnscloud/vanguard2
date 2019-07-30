@@ -1,12 +1,22 @@
 use crate::handler::{Query, QueryHandler};
 use futures::{
+    future::ok,
     stream::{Fuse, Peekable, Stream},
     sync::mpsc::{channel, Receiver, Sender},
     Async, Future, Poll,
 };
+use prometheus::{IntCounter, IntGauge};
 use r53::{Message, MessageRender};
 use std::io;
+use std::time::Duration;
 use tokio::{executor::spawn, net::UdpSocket};
+use tokio_timer::Interval;
+
+lazy_static! {
+    static ref QPS_INT_GAUGE: IntGauge = register_int_gauge!("pqs", "query per second").unwrap();
+    static ref QC_INT_COUNT: IntCounter =
+        register_int_counter!("qc", "query count until now").unwrap();
+}
 
 pub struct UdpStream<S: QueryHandler> {
     socket: UdpSocket,
@@ -61,6 +71,7 @@ impl<S: QueryHandler> Future for UdpStream<S> {
             if query.is_err() {
                 continue;
             }
+            QC_INT_COUNT.inc();
 
             let query = Query::new(query.unwrap(), src);
             let mut sender = UdpStreamSender::new(self.sender.clone());
@@ -93,4 +104,17 @@ impl UdpStreamSender {
             .try_send(response)
             .map_err(|_| io::Error::new(io::ErrorKind::Other, "full"))
     }
+}
+
+pub fn start_qps_calculate() -> impl Future<Item = (), Error = ()> {
+    let interval = Interval::new_interval(Duration::new(1, 0));
+    let mut last_qc = 0;
+    interval
+        .for_each(move |_| {
+            let qc = QC_INT_COUNT.get() as u64;
+            QPS_INT_GAUGE.set((qc - last_qc) as i64);
+            last_qc = qc;
+            ok(())
+        })
+        .map_err(|e| println!("timer get err {:?}", e))
 }

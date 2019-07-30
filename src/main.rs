@@ -6,9 +6,11 @@ use auth::{AuthServer, DynamicUpdateHandler};
 use cache::MessageLruCache;
 use clap::{App, Arg};
 use forwarder::Forwarder;
-use server::UdpStream;
+use metrics::start_metric_server;
+use server::{start_qps_calculate, UdpStream};
 use std::net::SocketAddr;
-use tokio::{net::UdpSocket, prelude::*};
+use std::thread;
+use tokio::{net::UdpSocket, prelude::*, runtime::current_thread};
 
 fn main() {
     let matches = App::new("auth")
@@ -30,6 +32,13 @@ fn main() {
             Arg::with_name("forwarder")
                 .help("dns recursive server address to forward request")
                 .long("forwarder")
+                .required(false)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("metrics")
+                .help("dns recursive server address to forward request")
+                .long("metrics")
                 .required(false)
                 .takes_value(true),
         )
@@ -58,5 +67,28 @@ fn main() {
         addr_and_port[0].to_string(),
         addr_and_port[1].parse().unwrap(),
     );
+
+    let addr = matches
+        .value_of("metrics")
+        .unwrap_or("0.0.0.0:9100")
+        .to_string();
+    let addr = addr.parse::<SocketAddr>().unwrap();
+    start_metrics(addr);
+
     tokio::run(udp_stream.map_err(|e| println!("server error = {:?}", e)));
+}
+
+fn start_metrics(addr: SocketAddr) {
+    thread::Builder::new()
+        .name("metrics".into())
+        .spawn(move || {
+            let mut rt = current_thread::Runtime::new().unwrap();
+            rt.spawn(start_metric_server(
+                addr,
+                "/metrics".to_string(),
+                "/statistics".to_string(),
+            ));
+            rt.block_on(start_qps_calculate()).unwrap();
+        })
+        .unwrap();
 }
