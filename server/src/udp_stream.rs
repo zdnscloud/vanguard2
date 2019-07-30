@@ -12,6 +12,9 @@ use std::time::Duration;
 use tokio::{executor::spawn, net::UdpSocket};
 use tokio_timer::Interval;
 
+const QUERY_BUFFER_LEN: usize = 1024;
+const MAX_QUERY_MESSAGE_LEN: usize = 1024;
+
 lazy_static! {
     static ref QPS_INT_GAUGE: IntGauge = register_int_gauge!("pqs", "query per second").unwrap();
     static ref QC_INT_COUNT: IntCounter =
@@ -27,7 +30,7 @@ pub struct UdpStream<S: QueryHandler> {
 
 impl<S: QueryHandler> UdpStream<S> {
     pub fn new(socket: UdpSocket, handler: S) -> Self {
-        let (sender, response_ch) = channel(1024);
+        let (sender, response_ch) = channel(QUERY_BUFFER_LEN);
         UdpStream {
             socket,
             sender,
@@ -62,7 +65,7 @@ impl<S: QueryHandler> Future for UdpStream<S> {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<(), Self::Error> {
-        let mut buf = [0u8; 1024];
+        let mut buf = [0u8; MAX_QUERY_MESSAGE_LEN];
         let mut render = MessageRender::new();
         loop {
             try_ready!(self.send_all_response(&mut render));
