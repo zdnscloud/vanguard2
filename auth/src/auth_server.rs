@@ -19,7 +19,7 @@ impl AuthServer {
     }
 
     pub fn handle_query(
-        &mut self,
+        &self,
         mut query: Query,
     ) -> impl Future<Item = Done, Error = Failed> + Send + 'static {
         let zones = self.zones.clone();

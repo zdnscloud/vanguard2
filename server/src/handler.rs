@@ -17,9 +17,9 @@ impl Query {
     }
 }
 
-pub trait QueryHandler: Send {
+pub trait QueryHandler: Send + Sync {
     fn handle_query(
-        &mut self,
+        &self,
         query: Query,
     ) -> Box<dyn Future<Item = Done, Error = Failed> + Send + 'static>;
 }

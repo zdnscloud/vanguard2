@@ -7,10 +7,10 @@ use cache::MessageLruCache;
 use clap::{App, Arg};
 use forwarder::Forwarder;
 use metrics::start_metric_server;
-use server::{start_qps_calculate, UdpStream};
+use server::{start_qps_calculate, Server};
 use std::net::SocketAddr;
 use std::thread;
-use tokio::{net::UdpSocket, prelude::*, runtime::current_thread};
+use tokio::runtime::current_thread;
 
 fn main() {
     let matches = App::new("auth")
@@ -48,9 +48,8 @@ fn main() {
         .value_of("dns_server")
         .unwrap_or("0.0.0.0:53")
         .to_string();
-    let addr = addr.parse::<SocketAddr>().unwrap();
-    let socket = UdpSocket::bind(&addr).unwrap();
-    println!("Listening on: {}", socket.local_addr().unwrap());
+    let dns_addr = addr.parse::<SocketAddr>().unwrap();
+    println!("Listening on: {}", dns_addr);
 
     let auth_server = AuthServer::new();
     let addr = matches
@@ -59,7 +58,7 @@ fn main() {
     let forwarder = Forwarder::new(addr.parse::<SocketAddr>().unwrap());
     let dynamic_server = DynamicUpdateHandler::new(auth_server.zones());
     let resolver = resolver::Resolver::new(auth_server, forwarder, MessageLruCache::new(0));
-    let udp_stream = UdpStream::new(socket, resolver);
+    let server = Server::new(dns_addr, resolver);
 
     let addr = matches.value_of("rpc_server").unwrap_or("0.0.0.0:5555");
     let addr_and_port = addr.split(":").collect::<Vec<&str>>();
@@ -75,7 +74,7 @@ fn main() {
     let addr = addr.parse::<SocketAddr>().unwrap();
     start_metrics(addr);
 
-    tokio::run(udp_stream.map_err(|e| println!("server error = {:?}", e)));
+    tokio::run(server.into_future());
 }
 
 fn start_metrics(addr: SocketAddr) {

@@ -6,7 +6,10 @@ extern crate lazy_static;
 extern crate prometheus;
 
 mod handler;
-mod udp_stream;
+mod server;
+mod tcp_server;
+mod udp_server;
 
 pub use handler::{Done, Failed, Query, QueryHandler};
-pub use udp_stream::{start_qps_calculate, UdpStream, UdpStreamSender};
+pub use server::Server;
+pub use udp_server::start_qps_calculate;

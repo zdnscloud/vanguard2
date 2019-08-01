@@ -23,12 +23,12 @@ impl<T: MessageCache> Resolver<T> {
 
 impl<T: MessageCache + Send + 'static> QueryHandler for Resolver<T> {
     fn handle_query(
-        &mut self,
+        &self,
         query: Query,
     ) -> Box<dyn Future<Item = Done, Error = Failed> + Send + 'static> {
         let read_cache = self.message_cache.clone();
         let write_cache = self.message_cache.clone();
-        let mut forwarder = self.forwarder.clone();
+        let forwarder = self.forwarder.clone();
         Box::new(
             self.auth
                 .handle_query(query)

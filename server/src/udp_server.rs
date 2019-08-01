@@ -8,6 +8,8 @@ use futures::{
 use prometheus::{IntCounter, IntGauge};
 use r53::{Message, MessageRender};
 use std::io;
+use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::{executor::spawn, net::UdpSocket};
 use tokio_timer::Interval;
@@ -16,22 +18,24 @@ const QUERY_BUFFER_LEN: usize = 1024;
 const MAX_QUERY_MESSAGE_LEN: usize = 1024;
 
 lazy_static! {
-    static ref QPS_INT_GAUGE: IntGauge = register_int_gauge!("pqs", "query per second").unwrap();
-    static ref QC_INT_COUNT: IntCounter =
+    static ref QPS_UDP_INT_GAUGE: IntGauge =
+        register_int_gauge!("pqs", "query per second").unwrap();
+    static ref QC_UDP_INT_COUNT: IntCounter =
         register_int_counter!("qc", "query count until now").unwrap();
 }
 
-pub struct UdpStream<S: QueryHandler> {
+pub struct UdpServer<S: QueryHandler> {
     socket: UdpSocket,
     sender: Sender<Query>,
-    handler: S,
+    handler: Arc<S>,
     response_ch: Peekable<Fuse<Receiver<Query>>>,
 }
 
-impl<S: QueryHandler> UdpStream<S> {
-    pub fn new(socket: UdpSocket, handler: S) -> Self {
+impl<S: QueryHandler> UdpServer<S> {
+    pub fn new(addr: SocketAddr, handler: Arc<S>) -> Self {
+        let socket = UdpSocket::bind(&addr).unwrap();
         let (sender, response_ch) = channel(QUERY_BUFFER_LEN);
-        UdpStream {
+        UdpServer {
             socket,
             sender,
             handler,
@@ -60,7 +64,7 @@ impl<S: QueryHandler> UdpStream<S> {
     }
 }
 
-impl<S: QueryHandler> Future for UdpStream<S> {
+impl<S: QueryHandler> Future for UdpServer<S> {
     type Item = ();
     type Error = io::Error;
 
@@ -74,7 +78,7 @@ impl<S: QueryHandler> Future for UdpStream<S> {
             if query.is_err() {
                 continue;
             }
-            QC_INT_COUNT.inc();
+            QC_UDP_INT_COUNT.inc();
 
             let query = Query::new(query.unwrap(), src);
             let mut sender = UdpStreamSender::new(self.sender.clone());
@@ -114,8 +118,8 @@ pub fn start_qps_calculate() -> impl Future<Item = (), Error = ()> {
     let mut last_qc = 0;
     interval
         .for_each(move |_| {
-            let qc = QC_INT_COUNT.get() as u64;
-            QPS_INT_GAUGE.set((qc - last_qc) as i64);
+            let qc = QC_UDP_INT_COUNT.get() as u64;
+            QPS_UDP_INT_GAUGE.set((qc - last_qc) as i64);
             last_qc = qc;
             ok(())
         })

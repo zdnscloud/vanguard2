@@ -18,7 +18,7 @@ impl Forwarder {
     }
 
     pub fn handle_query(
-        &mut self,
+        &self,
         query: Query,
     ) -> impl Future<Item = Done, Error = Failed> + Send + 'static {
         let mut render = MessageRender::new();
