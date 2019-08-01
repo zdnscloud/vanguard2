@@ -3,7 +3,7 @@ use std::{io, net::SocketAddr, sync::Arc, time::Duration};
 use crate::handler::{Query, QueryHandler};
 use futures::{
     future::ok,
-    stream::{Fuse, Peekable, Stream},
+    stream::{Fuse, Stream},
     sync::mpsc::{channel, Receiver, Sender},
     Async, Future, Poll,
 };
@@ -26,7 +26,7 @@ pub struct UdpServer<S: QueryHandler> {
     socket: UdpSocket,
     sender: Sender<Query>,
     handler: Arc<S>,
-    response_ch: Peekable<Fuse<Receiver<Query>>>,
+    response_ch: Fuse<Receiver<Query>>,
 }
 
 impl<S: QueryHandler> UdpServer<S> {
@@ -37,13 +37,13 @@ impl<S: QueryHandler> UdpServer<S> {
             socket,
             sender,
             handler,
-            response_ch: response_ch.fuse().peekable(),
+            response_ch: response_ch.fuse(),
         }
     }
 
     fn send_all_response(&mut self, render: &mut MessageRender) -> Poll<(), io::Error> {
         loop {
-            match self.response_ch.peek() {
+            match self.response_ch.poll() {
                 Ok(Async::Ready(Some(query))) => {
                     query.message.rend(render);
                     try_ready!(self.socket.poll_send_to(render.data(), &query.client));
@@ -51,12 +51,6 @@ impl<S: QueryHandler> UdpServer<S> {
                 }
                 Ok(Async::Ready(None)) | Ok(Async::NotReady) => return Ok(Async::Ready(())),
                 Err(_) => panic!("get error form channel"),
-            }
-
-            match self.response_ch.poll() {
-                Err(_) => panic!("get error when poll response"),
-                Ok(Async::NotReady) => return Ok(Async::Ready(())),
-                _ => (),
             }
         }
     }
