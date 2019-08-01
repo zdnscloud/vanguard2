@@ -1,16 +1,18 @@
-use std::io::{self, Read, Write};
-use std::mem;
-use std::net::SocketAddr;
-use std::time::Duration;
+use std::{
+    io::{self, Read, Write},
+    mem,
+    net::SocketAddr,
+    time::Duration,
+};
 
 use crate::handler::{Done, Failed, Query, QueryHandler};
-use futures::stream::Stream;
-use futures::{future, Async, Future, Poll};
+use futures::{future, stream::Stream, Async, Future, Poll};
 use r53::{Message, MessageRender};
 use std::sync::Arc;
-use tokio::executor::spawn;
-use tokio::net::TcpListener;
-use tokio::net::TcpStream;
+use tokio::{
+    executor::spawn,
+    net::{TcpListener, TcpStream},
+};
 use tokio_io::try_nb;
 use tokio_timer::Timeout;
 
@@ -181,29 +183,20 @@ impl<S: QueryHandler> TcpStreamWrapper<S> {
             match current_state {
                 Some(WriteTcpState::LenBytes { pos, length, bytes }) => {
                     if pos < length.len() {
-                        mem::replace(
-                            &mut self.send_state,
-                            Some(WriteTcpState::LenBytes { pos, length, bytes }),
-                        );
+                        self.send_state = Some(WriteTcpState::LenBytes { pos, length, bytes });
                     } else {
-                        mem::replace(
-                            &mut self.send_state,
-                            Some(WriteTcpState::Bytes { pos: 0, bytes }),
-                        );
+                        self.send_state = Some(WriteTcpState::Bytes { pos: 0, bytes });
                     }
                 }
                 Some(WriteTcpState::Bytes { pos, bytes }) => {
                     if pos < bytes.len() {
-                        mem::replace(
-                            &mut self.send_state,
-                            Some(WriteTcpState::Bytes { pos, bytes }),
-                        );
+                        self.send_state = Some(WriteTcpState::Bytes { pos, bytes });
                     } else {
-                        mem::replace(&mut self.send_state, Some(WriteTcpState::Flushing));
+                        self.send_state = Some(WriteTcpState::Flushing);
                     }
                 }
                 Some(WriteTcpState::Flushing) => {
-                    mem::replace(&mut self.send_state, None);
+                    self.send_state = None;
                 }
                 None => {
                     panic!("this shouldn't happend");

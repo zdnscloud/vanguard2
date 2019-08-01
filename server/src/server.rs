@@ -1,9 +1,9 @@
+use std::{net::SocketAddr, sync::Arc};
+
 use crate::handler::QueryHandler;
 use crate::tcp_server::TcpServer;
 use crate::udp_server::UdpServer;
 use futures::{future, Future};
-use std::net::SocketAddr;
-use std::sync::Arc;
 use tokio::executor::spawn;
 
 pub struct Server<S: QueryHandler> {

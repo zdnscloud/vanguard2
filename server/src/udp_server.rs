@@ -1,3 +1,5 @@
+use std::{io, net::SocketAddr, sync::Arc, time::Duration};
+
 use crate::handler::{Query, QueryHandler};
 use futures::{
     future::ok,
@@ -7,10 +9,6 @@ use futures::{
 };
 use prometheus::{IntCounter, IntGauge};
 use r53::{Message, MessageRender};
-use std::io;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::time::Duration;
 use tokio::{executor::spawn, net::UdpSocket};
 use tokio_timer::Interval;
 
