@@ -19,3 +19,4 @@ server = { path = "server" }
 cache = { path = "cache" }
 forwarder = { path = "forwarder" }
 auth = { path = "auth" }
+resolver = { path = "resolver" }

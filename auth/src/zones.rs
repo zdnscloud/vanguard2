@@ -38,7 +38,8 @@ impl AuthZone {
     }
 
     pub fn handle_query(&self, req: &mut Message) -> bool {
-        let zone = self.get_zone(&req.question.name);
+        let question = req.question.as_ref().unwrap();
+        let zone = self.get_zone(&question.name);
         if zone.is_none() {
             //let mut builder = MessageBuilder::new(req);
             //builder.make_response().rcode(Rcode::Refused).done();
@@ -46,13 +47,9 @@ impl AuthZone {
         }
 
         let zone = zone.unwrap();
-        let mut result = zone.find(
-            &req.question.name,
-            req.question.typ,
-            FindOption::FollowZoneCut,
-        );
+        let mut result = zone.find(&question.name, question.typ, FindOption::FollowZoneCut);
 
-        let query_type = req.question.typ;
+        let query_type = question.typ;
         let mut builder = MessageBuilder::new(req);
         builder.make_response().set_flag(HeaderFlag::AuthAnswer);
         match result.typ {
@@ -82,7 +79,7 @@ impl AuthZone {
             }
             FindResultType::NXDomain => {
                 builder
-                    .rcode(Rcode::NXDomian)
+                    .rcode(Rcode::NXDomain)
                     .add_auth(result.get_apex_soa());
             }
             FindResultType::NXRRset => {

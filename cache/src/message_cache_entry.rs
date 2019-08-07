@@ -40,7 +40,7 @@ impl MessageEntry {
         let mut answer_rrset_count = 0;
         let mut auth_rrset_count = 0;
         let mut additional_rrset_count = 0;
-        if let Some(answers) = message.sections[SectionType::Answer as usize].0.take() {
+        if let Some(answers) = message.take_section(SectionType::Answer) {
             answer_rrset_count = answers.len() as u16;
             rrset_refs.append(&mut add_rrset_in_section(
                 positive_cache,
@@ -51,7 +51,7 @@ impl MessageEntry {
             ));
         }
         if response_is_negative {
-            if let Some(authorities) = message.sections[SectionType::Auth as usize].0.take() {
+            if let Some(authorities) = message.take_section(SectionType::Authority) {
                 auth_rrset_count = authorities.len() as u16;
                 rrset_refs.append(&mut add_rrset_in_negative_response_auth_section(
                     positive_cache,
@@ -62,19 +62,19 @@ impl MessageEntry {
                 ));
             }
         } else {
-            if let Some(authorities) = message.sections[SectionType::Auth as usize].0.take() {
+            if let Some(authorities) = message.take_section(SectionType::Authority) {
                 auth_rrset_count = authorities.len() as u16;
                 rrset_refs.append(&mut add_rrset_in_section(
                     positive_cache,
                     &message,
                     authorities,
-                    SectionType::Auth,
+                    SectionType::Authority,
                     &mut min_ttl,
                 ));
             }
         }
 
-        if let Some(additionals) = message.sections[SectionType::Additional as usize].0.take() {
+        if let Some(additionals) = message.take_section(SectionType::Additional) {
             additional_rrset_count = additionals.len() as u16;
             rrset_refs.append(&mut add_rrset_in_section(
                 positive_cache,
@@ -88,9 +88,11 @@ impl MessageEntry {
             .checked_add(Duration::from_secs(min_ttl.0 as u64))
             .unwrap();
 
+        let question = message.question.take().unwrap();
+        let qtype = question.typ;
         MessageEntry {
-            name: Box::into_raw(Box::new(message.question.name)),
-            typ: message.question.typ,
+            name: Box::into_raw(Box::new(question.name)),
+            typ: qtype,
             answer_rrset_count,
             auth_rrset_count,
             additional_rrset_count,
@@ -200,7 +202,7 @@ fn add_rrset_in_negative_response_auth_section(
     min_ttl: &mut RRTtl,
 ) -> Vec<RRsetRef> {
     let mut refs = Vec::with_capacity(rrsets.len());
-    let trust_level = get_rrset_trust_level(message, SectionType::Auth);
+    let trust_level = get_rrset_trust_level(message, SectionType::Authority);
     for rrset in rrsets.into_iter() {
         refs.push(RRsetRef {
             name: rrset.name.clone(),
@@ -255,7 +257,7 @@ mod tests {
             let mut builder = MessageBuilder::new(&mut msg);
             builder
                 .id(1200)
-                .rcode(Rcode::NXDomian)
+                .rcode(Rcode::NXDomain)
                 .set_flag(HeaderFlag::RecursionDesired)
                 .add_auth(RRset::from_str("example.com. 30 IN SOA a.gtld-servers.net. nstld.verisign-grs.com. 1563935574 1800 900 604800 86400").unwrap())
                 .edns(Edns {
@@ -297,7 +299,7 @@ mod tests {
 
         for section in vec![
             SectionType::Answer,
-            SectionType::Auth,
+            SectionType::Authority,
             SectionType::Additional,
         ] {
             let gen_message_sections = query.section(section).unwrap();
@@ -337,7 +339,7 @@ mod tests {
         assert_eq!(query.header.ns_count, message.header.ns_count);
         assert_eq!(query.header.ar_count, message.header.ar_count - 1);
 
-        for section in vec![SectionType::Auth] {
+        for section in vec![SectionType::Authority] {
             let gen_message_sections = query.section(section).unwrap();
             for (i, rrset) in message.section(section).unwrap().iter().enumerate() {
                 assert_eq!(rrset.typ, gen_message_sections[i].typ);

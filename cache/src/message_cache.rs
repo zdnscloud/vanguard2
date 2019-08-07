@@ -33,7 +33,10 @@ impl MessageCache for MessageLruCache {
     }
 
     fn gen_response(&mut self, query: &mut Message) -> bool {
-        let key = &EntryKey(&query.question.name as *const Name, query.question.typ);
+        let key = &EntryKey(
+            &query.question.as_ref().unwrap().name as *const Name,
+            query.question.as_ref().unwrap().typ,
+        );
         if let Some(entry) = self.messages.get(key) {
             let succeed =
                 entry.fill_message(query, &mut self.positive_cache, &mut self.negative_cache);
@@ -51,7 +54,10 @@ impl MessageCache for MessageLruCache {
             return;
         }
 
-        let key = &EntryKey(&message.question.name as *const Name, message.question.typ);
+        let key = &EntryKey(
+            &message.question.as_ref().unwrap().name as *const Name,
+            message.question.as_ref().unwrap().typ,
+        );
         self.messages.pop(key);
         let entry = MessageEntry::new(message, &mut self.positive_cache, &mut self.negative_cache);
         self.messages.put(entry.key(), entry);

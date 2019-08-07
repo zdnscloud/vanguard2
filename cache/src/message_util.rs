@@ -3,7 +3,7 @@ use r53::{header_flag, message::SectionType, Message, RRType, Rcode};
 
 pub(crate) fn is_negative_response(message: &Message) -> bool {
     let rcode = message.header.rcode;
-    if rcode == Rcode::NXDomian {
+    if rcode == Rcode::NXDomain {
         return true;
     }
     if rcode == Rcode::NoError {
@@ -19,7 +19,11 @@ pub(crate) fn is_negative_response(message: &Message) -> bool {
 }
 
 pub(crate) fn can_message_be_cached(message: &Message) -> bool {
-    if is_negative_response(message) && !has_rrset_with_type_in_auth_sec(message, RRType::SOA) {
+    if message.question.is_none() {
+        false
+    } else if is_negative_response(message)
+        && !has_rrset_with_type_in_auth_sec(message, RRType::SOA)
+    {
         false
     } else {
         true
@@ -27,14 +31,11 @@ pub(crate) fn can_message_be_cached(message: &Message) -> bool {
 }
 
 fn has_rrset_with_type_in_auth_sec(message: &Message, typ: RRType) -> bool {
-    let sections = &message.sections[SectionType::Auth as usize];
-    if sections.0.is_none() {
-        return false;
-    }
-
-    for rrset in sections.0.as_ref().unwrap() {
-        if rrset.typ == typ {
-            return true;
+    if let Some(authority) = message.section(SectionType::Authority) {
+        for rrset in authority {
+            if rrset.typ == typ {
+                return true;
+            }
         }
     }
     false
@@ -50,7 +51,7 @@ pub(crate) fn get_rrset_trust_level(message: &Message, section: SectionType) -> 
                 return RRsetTrustLevel::AnswerWithoutAA;
             }
         }
-        SectionType::Auth => {
+        SectionType::Authority => {
             if aa {
                 return RRsetTrustLevel::AuthorityWithAA;
             } else {
