@@ -1,12 +1,13 @@
 use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
-    net::IpAddr,
+    net::{IpAddr, Ipv4Addr},
     time::{Duration, Instant},
 };
 
 const UNREACHABLE_CACHE_TIME: u64 = 5;
 const UNREACHABLE_RTT: u32 = u32::max_value();
 
+#[derive(Clone)]
 pub struct AddressEntry {
     address: IpAddr,
     rtt: u32,
@@ -25,6 +26,14 @@ impl AddressEntry {
     #[inline]
     pub fn get_addr(&self) -> IpAddr {
         self.address
+    }
+
+    #[inline]
+    pub fn get_v4_addr(&self) -> Ipv4Addr {
+        match self.address {
+            IpAddr::V4(addr) => addr,
+            _ => unreachable!(),
+        }
     }
 
     #[inline]

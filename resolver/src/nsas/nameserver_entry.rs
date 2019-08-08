@@ -1,4 +1,5 @@
-use crate::nsas::{address_entry::AddressEntry, entry_key::EntryKey};
+use crate::nsas::{address_entry::AddressEntry, address_selector, entry_key::EntryKey};
+use lru::LruCache;
 use r53::Name;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::{Duration, Instant};
@@ -9,6 +10,8 @@ pub struct NameserverEntry {
     expire_time: Instant,
 }
 
+pub type NameserverCache = LruCache<EntryKey, NameserverEntry>;
+
 impl NameserverEntry {
     pub fn new(name: Name, addresses: Vec<AddressEntry>) -> Self {
         NameserverEntry {
@@ -18,12 +21,29 @@ impl NameserverEntry {
         }
     }
 
-    pub fn get_name(&self) -> Name {
-        self.name.clone()
+    #[inline]
+    pub fn get_name(&self) -> &Name {
+        &self.name
     }
 
+    #[inline]
+    pub fn get_key(&self) -> EntryKey {
+        EntryKey(&self.name as *const Name)
+    }
+
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.addresses.is_empty()
+    }
+
+    #[inline]
+    pub fn get_addresses(&self) -> &Vec<AddressEntry> {
+        &self.addresses
+    }
+
+    #[inline]
+    pub fn select_address(&self) -> Option<AddressEntry> {
+        address_selector::select_address(&self.addresses)
     }
 
     pub fn update_address_rtt(&mut self, target: IpAddr, rtt: u32) {
@@ -44,18 +64,9 @@ impl NameserverEntry {
         }
     }
 
-    pub fn get_address(&self) -> Option<Ipv4Addr> {
-        self.select_address()
+    /*
+    pub fn select_address(&self) -> Option<&AddressEntry> {
+        address_selector::select_address(&self.addresses)
     }
-
-    fn select_address(&self) -> Option<Ipv4Addr> {
-        self.addresses
-            .iter()
-            .filter(|a| a.is_v4())
-            .min()
-            .map(|a| match a.get_addr() {
-                IpAddr::V4(addr) => addr,
-                _ => panic!("never shold be here"),
-            })
-    }
+    */
 }

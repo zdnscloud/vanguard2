@@ -1,4 +1,9 @@
-use crate::nsas::nameserver_entry::NameserverEntry;
+use crate::nsas::{
+    address_entry::AddressEntry,
+    address_selector,
+    entry_key::EntryKey,
+    nameserver_entry::{NameserverCache, NameserverEntry},
+};
 use r53::Name;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::{Duration, Instant};
@@ -7,12 +12,6 @@ pub struct ZoneEntry {
     name: Name,
     nameservers: Vec<Name>,
     expire_time: Instant,
-}
-
-pub struct NameServer {
-    zone: Name,
-    nameserver: Name,
-    address: Ipv4Addr,
 }
 
 impl ZoneEntry {
@@ -24,5 +23,40 @@ impl ZoneEntry {
                 .checked_add(ttl)
                 .expect("zone ttl out of range"),
         }
+    }
+
+    #[inline]
+    pub fn get_key(&self) -> EntryKey {
+        EntryKey(&self.name as *const Name)
+    }
+
+    pub fn select_nameserver(
+        &self,
+        nameservers: &mut NameserverCache,
+    ) -> (Option<AddressEntry>, Vec<Name>) {
+        let mut missing_names = self.nameservers.clone();
+        let mut servers = Vec::with_capacity(missing_names.len());
+        for i in (0..missing_names.len()).rev() {
+            let name = missing_names.swap_remove(i);
+            let key = &EntryKey(&name as *const Name);
+            let mut nameserver_is_healthy = false;
+            if let Some(entry) = nameservers.get(key) {
+                if let Some(addr) = entry.select_address() {
+                    servers.push(addr);
+                    nameserver_is_healthy = true;
+                }
+            }
+            if !nameserver_is_healthy {
+                missing_names.push(name);
+            }
+        }
+        (
+            address_selector::select_address(&servers).map(|a| a.clone()),
+            missing_names,
+        )
+    }
+
+    pub fn get_nameservers(&self) -> Vec<Name> {
+        self.nameservers.clone()
     }
 }
