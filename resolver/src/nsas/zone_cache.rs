@@ -45,7 +45,7 @@ impl<R: Resolver + Clone + 'static + Send> ZoneCache<R> {
 
     pub fn get_nameserver(&mut self, zone: &Name) -> Box<Future<Item = Ipv4Addr, Error = ()>> {
         let (address, missing_nameserver) = {
-            let key = &EntryKey(zone as *const Name);
+            let key = &EntryKey::from_name(zone);
             let mut zones = self.zones.lock().unwrap();
             if let Some(entry) = zones.get(key) {
                 entry.select_nameserver(&mut self.nameservers.lock().unwrap())

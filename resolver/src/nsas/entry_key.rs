@@ -9,6 +9,12 @@ pub struct EntryKey(pub *const Name);
 
 unsafe impl Send for EntryKey {}
 
+impl EntryKey {
+    pub fn from_name(n: &Name) -> Self {
+        EntryKey(n as *const Name)
+    }
+}
+
 impl Clone for EntryKey {
     fn clone(&self) -> Self {
         EntryKey(self.0)

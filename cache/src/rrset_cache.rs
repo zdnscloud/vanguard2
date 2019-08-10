@@ -86,4 +86,28 @@ mod tests {
             .get_rrset(&Name::new("www1.zdns.cn").unwrap(), RRType::A)
             .is_some());
     }
+
+    #[test]
+    fn test_rrset_cache_bench() {
+        let mut cache = RRsetLruCache::new(10);
+        assert_eq!(cache.len(), 0);
+        for i in 0..1000 {
+            let rrset = format!("www{}.zdns.cn 300 IN A 1.1.1.1", i);
+            let rrset = RRset::from_str(rrset.as_ref()).unwrap();
+            cache.add_rrset(rrset.clone(), RRsetTrustLevel::NonAuthAnswerWithAA);
+        }
+        assert_eq!(cache.len(), 10);
+
+        for i in 0..989 {
+            let rrset = format!("www{}.zdns.cn 300 IN A 1.1.1.1", i);
+            let rrset = RRset::from_str(rrset.as_ref()).unwrap();
+            assert!(cache.get_rrset(&rrset.name, rrset.typ).is_none());
+        }
+
+        for i in 990..1000 {
+            let rrset = format!("www{}.zdns.cn 300 IN A 1.1.1.1", i);
+            let rrset = RRset::from_str(rrset.as_ref()).unwrap();
+            assert!(cache.get_rrset(&rrset.name, rrset.typ).is_some());
+        }
+    }
 }

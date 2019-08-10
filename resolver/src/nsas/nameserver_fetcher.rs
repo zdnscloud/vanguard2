@@ -84,6 +84,103 @@ impl<R: Resolver + Clone + 'static> Future for NameserverFetcher<R> {
                     }
                 }
             }
+            self.fut = None;
         }
     }
+}
+
+mod test {
+    use super::*;
+    use crate::nsas::test_helper::DumbResolver;
+    use lru::LruCache;
+    use r53::{util::hex::from_hex, RData, RRset};
+    use std::net::Ipv4Addr;
+    use tokio::runtime::Runtime;
+
+    //#[test]
+    fn test_fetch_all() {
+        let mut resolver = DumbResolver::new(0);
+        resolver.set_answer(vec![RData::from_str(RRType::A, "1.1.1.1").unwrap()]);
+
+        let nameservers = Arc::new(Mutex::new(LruCache::new(100)));
+
+        let mut fetcher = NameserverFetcher::new(
+            FetchStyle::FetchAll,
+            vec![
+                Name::new("ns1.knet.cn").unwrap(),
+                Name::new("ns2.knet.cn").unwrap(),
+                Name::new("ns3.knet.cn").unwrap(),
+            ],
+            nameservers.clone(),
+            resolver,
+        );
+        assert_eq!(nameservers.lock().unwrap().len(), 0);
+
+        let mut rt = Runtime::new().unwrap();
+        rt.block_on(fetcher.map(|_| ()));
+
+        assert_eq!(nameservers.lock().unwrap().len(), 3);
+    }
+
+    //#[test]
+    fn test_fetch_any() {
+        let mut resolver = DumbResolver::new(0);
+        resolver.set_answer(vec![RData::from_str(RRType::A, "1.1.1.1").unwrap()]);
+
+        let nameservers = Arc::new(Mutex::new(LruCache::new(100)));
+
+        let mut fetcher = NameserverFetcher::new(
+            FetchStyle::FetchAny,
+            vec![
+                Name::new("ns1.knet.cn").unwrap(),
+                Name::new("ns2.knet.cn").unwrap(),
+                Name::new("ns3.knet.cn").unwrap(),
+            ],
+            nameservers.clone(),
+            resolver,
+        );
+        assert_eq!(nameservers.lock().unwrap().len(), 0);
+
+        let mut rt = Runtime::new().unwrap();
+        rt.block_on(fetcher.map(|_| ()));
+
+        assert_eq!(nameservers.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_fetch_any_get_err() {
+        let mut resolver = DumbResolver::new(1);
+        resolver.set_answer(vec![RData::from_str(RRType::A, "1.1.1.1").unwrap()]);
+
+        let nameservers = Arc::new(Mutex::new(LruCache::new(100)));
+
+        let mut fetcher = NameserverFetcher::new(
+            FetchStyle::FetchAny,
+            vec![
+                Name::new("ns1.knet.cn").unwrap(),
+                Name::new("ns2.knet.cn").unwrap(),
+                Name::new("ns3.knet.cn").unwrap(),
+            ],
+            nameservers.clone(),
+            resolver,
+        );
+        assert_eq!(nameservers.lock().unwrap().len(), 0);
+
+        let mut rt = Runtime::new().unwrap();
+        rt.block_on(fetcher.map(|_| ()));
+
+        let mut nameservers = nameservers.lock().unwrap();
+        assert_eq!(nameservers.len(), 1);
+
+        let nameserver = Name::new("ns2.knet.cn").unwrap();
+        let key = EntryKey::from_name(&nameserver);
+        let entry = nameservers.get(&key);
+        assert!(entry.is_some());
+
+        let entry = entry.unwrap();
+        let addresses = entry.get_addresses();
+        assert_eq!(addresses.len(), 1);
+        assert_eq!(addresses[0].get_v4_addr(), Ipv4Addr::new(1, 1, 1, 1));
+    }
+
 }

@@ -5,5 +5,6 @@ mod error;
 mod message_util;
 mod nameserver_entry;
 mod nameserver_fetcher;
+mod test_helper;
 mod zone_cache;
 mod zone_entry;

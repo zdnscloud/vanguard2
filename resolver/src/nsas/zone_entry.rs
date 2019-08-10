@@ -9,13 +9,16 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::{Duration, Instant};
 
 pub struct ZoneEntry {
-    name: Name,
+    name: *mut Name,
     nameservers: Vec<Name>,
     expire_time: Instant,
 }
 
+unsafe impl Send for ZoneEntry {}
+
 impl ZoneEntry {
     pub fn new(name: Name, nameservers: Vec<Name>, ttl: Duration) -> Self {
+        let name = Box::into_raw(Box::new(name));
         ZoneEntry {
             name,
             nameservers,
@@ -27,7 +30,7 @@ impl ZoneEntry {
 
     #[inline]
     pub fn get_key(&self) -> EntryKey {
-        EntryKey(&self.name as *const Name)
+        EntryKey(self.name)
     }
 
     pub fn select_nameserver(
@@ -38,7 +41,7 @@ impl ZoneEntry {
         let mut servers = Vec::with_capacity(missing_names.len());
         for i in (0..missing_names.len()).rev() {
             let name = missing_names.swap_remove(i);
-            let key = &EntryKey(&name as *const Name);
+            let key = &EntryKey::from_name(&name);
             let mut nameserver_is_healthy = false;
             if let Some(entry) = nameservers.get(key) {
                 if let Some(addr) = entry.select_address() {
@@ -58,5 +61,13 @@ impl ZoneEntry {
 
     pub fn get_nameservers(&self) -> Vec<Name> {
         self.nameservers.clone()
+    }
+}
+
+impl Drop for ZoneEntry {
+    fn drop(&mut self) {
+        unsafe {
+            Box::from_raw(self.name);
+        }
     }
 }
