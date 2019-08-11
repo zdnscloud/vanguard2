@@ -1,8 +1,7 @@
 use crate::nsas::{
     address_entry::AddressEntry,
-    address_selector,
     entry_key::EntryKey,
-    nameserver_entry::{NameserverCache, NameserverEntry},
+    nameserver_entry::{Nameserver, NameserverCache, NameserverEntry},
 };
 use r53::Name;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -36,7 +35,7 @@ impl ZoneEntry {
     pub fn select_nameserver(
         &self,
         nameservers: &mut NameserverCache,
-    ) -> (Option<AddressEntry>, Vec<Name>) {
+    ) -> (Option<Nameserver>, Vec<Name>) {
         let mut missing_names = self.nameservers.clone();
         let mut servers = Vec::with_capacity(missing_names.len());
         for i in (0..missing_names.len()).rev() {
@@ -44,22 +43,24 @@ impl ZoneEntry {
             let key = &EntryKey::from_name(&name);
             let mut nameserver_is_healthy = false;
             if let Some(entry) = nameservers.get(key) {
-                if let Some(addr) = entry.select_address() {
-                    servers.push(addr);
-                    nameserver_is_healthy = true;
-                }
+                servers.push(entry.select_nameserver());
+                nameserver_is_healthy = true;
             }
             if !nameserver_is_healthy {
                 missing_names.push(name);
             }
         }
-        (
-            address_selector::select_address(&servers).map(|a| a.clone()),
-            missing_names,
-        )
+        if servers.is_empty() {
+            (None, missing_names)
+        } else {
+            (
+                Some(servers.iter().min().map(|a| a.clone()).unwrap()),
+                missing_names,
+            )
+        }
     }
 
-    pub fn get_nameservers(&self) -> Vec<Name> {
+    pub fn get_server_names(&self) -> Vec<Name> {
         self.nameservers.clone()
     }
 }

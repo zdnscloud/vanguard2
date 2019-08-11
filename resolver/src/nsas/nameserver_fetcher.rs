@@ -2,7 +2,7 @@ use crate::{
     nsas::{
         entry_key::EntryKey,
         message_util::{message_to_nameserver_entry, message_to_zone_entry},
-        nameserver_entry::{NameserverCache, NameserverEntry},
+        nameserver_entry::{Nameserver, NameserverCache, NameserverEntry},
     },
     Resolver,
 };
@@ -51,7 +51,7 @@ impl<R: Resolver + Clone + 'static> NameserverFetcher<R> {
 }
 
 impl<R: Resolver + Clone + 'static> Future for NameserverFetcher<R> {
-    type Item = Ipv4Addr;
+    type Item = Nameserver;
     type Error = ();
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
@@ -76,10 +76,10 @@ impl<R: Resolver + Clone + 'static> Future for NameserverFetcher<R> {
                     if let Ok(entry) =
                         message_to_nameserver_entry(self.current_name.take().unwrap(), msg)
                     {
-                        let addr = entry.select_address().unwrap().get_v4_addr();
+                        let nameserver = entry.select_nameserver();
                         self.nameservers.lock().unwrap().put(entry.get_key(), entry);
                         if self.style == FetchStyle::FetchAny {
-                            return Ok(Async::Ready(addr));
+                            return Ok(Async::Ready(nameserver));
                         }
                     }
                 }
@@ -182,5 +182,4 @@ mod test {
         assert_eq!(addresses.len(), 1);
         assert_eq!(addresses[0].get_v4_addr(), Ipv4Addr::new(1, 1, 1, 1));
     }
-
 }

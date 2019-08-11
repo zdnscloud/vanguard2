@@ -4,7 +4,7 @@ use crate::{
         entry_key::EntryKey,
         error::NSASError,
         message_util::{message_to_nameserver_entry, message_to_zone_entry},
-        nameserver_entry::{NameserverCache, NameserverEntry},
+        nameserver_entry::{Nameserver, NameserverCache, NameserverEntry},
         nameserver_fetcher::{FetchStyle, NameserverFetcher},
         zone_entry::ZoneEntry,
     },
@@ -16,7 +16,6 @@ use lru::LruCache;
 use r53::{Message, Name, RRType};
 use std::{
     io,
-    net::Ipv4Addr,
     sync::{Arc, Mutex},
 };
 use tokio::executor::spawn;
@@ -43,8 +42,8 @@ impl<R: Resolver + Clone + 'static + Send> ZoneCache<R> {
         }
     }
 
-    pub fn get_nameserver(&mut self, zone: &Name) -> Box<Future<Item = Ipv4Addr, Error = ()>> {
-        let (address, missing_nameserver) = {
+    pub fn get_nameserver(&mut self, zone: &Name) -> Box<Future<Item = Nameserver, Error = ()>> {
+        let (nameserver, missing_nameserver) = {
             let key = &EntryKey::from_name(zone);
             let mut zones = self.zones.lock().unwrap();
             if let Some(entry) = zones.get(key) {
@@ -54,7 +53,7 @@ impl<R: Resolver + Clone + 'static + Send> ZoneCache<R> {
             }
         };
 
-        if address.is_some() {
+        if nameserver.is_some() {
             if !missing_nameserver.is_empty() {
                 spawn(
                     NameserverFetcher::new(
@@ -66,13 +65,13 @@ impl<R: Resolver + Clone + 'static + Send> ZoneCache<R> {
                     .map(|_| ()),
                 );
             }
-            return Box::new(future::ok(address.unwrap().get_v4_addr()));
+            return Box::new(future::ok(nameserver.unwrap()));
         } else {
             return self.fetch_zone(zone);
         }
     }
 
-    fn fetch_zone(&self, zone: &Name) -> Box<Future<Item = Ipv4Addr, Error = ()>> {
+    fn fetch_zone(&self, zone: &Name) -> Box<Future<Item = Nameserver, Error = ()>> {
         let resolver = self.resolver.clone();
         let zone_name = zone.clone();
         let zones = self.zones.clone();
@@ -94,12 +93,12 @@ impl<R: Resolver + Clone + 'static + Send> ZoneCache<R> {
                             for nameserver_entry in nameserver_entries {
                                 nameservers.put(nameserver_entry.get_key(), nameserver_entry);
                             }
-                            let (address, _) = zone_entry.select_nameserver(&mut nameservers);
+                            let (nameserver, _) = zone_entry.select_nameserver(&mut nameservers);
                             let mut zones = zones.lock().unwrap();
                             zones.put(zone_entry.get_key(), zone_entry);
-                            return future::ok(address.unwrap().get_v4_addr());
+                            return future::ok(nameserver.unwrap());
                         }
-                        return future::err(Some(zone_entry.get_nameservers()));
+                        return future::err(Some(zone_entry.get_server_names()));
                     }
                     return future::err(None);
                 })

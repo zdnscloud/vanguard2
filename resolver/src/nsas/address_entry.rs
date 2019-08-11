@@ -7,7 +7,7 @@ use std::{
 const UNREACHABLE_CACHE_TIME: u64 = 5;
 const UNREACHABLE_RTT: u32 = u32::max_value();
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct AddressEntry {
     address: IpAddr,
     rtt: u32,
@@ -95,5 +95,31 @@ impl PartialOrd for AddressEntry {
 impl Ord for AddressEntry {
     fn cmp(&self, other: &AddressEntry) -> Ordering {
         self.rtt.cmp(&other.rtt)
+    }
+}
+
+pub fn select_address(addresses: &Vec<AddressEntry>) -> Option<AddressEntry> {
+    addresses
+        .iter()
+        .filter(|a| a.get_addr().is_ipv4())
+        .min()
+        .map(|a| *a)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::net::Ipv6Addr;
+
+    #[test]
+    fn test_address_selector() {
+        let addresses = vec![
+            AddressEntry::new(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)), 0),
+            AddressEntry::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 1),
+            AddressEntry::new(IpAddr::V4(Ipv4Addr::new(2, 2, 2, 2)), 2),
+        ];
+
+        let target = select_address(&addresses);
+        assert_eq!(target.unwrap().get_addr(), Ipv4Addr::new(1, 1, 1, 1));
     }
 }

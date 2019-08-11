@@ -1,5 +1,4 @@
 mod address_entry;
-mod address_selector;
 mod entry_key;
 mod error;
 mod message_util;
