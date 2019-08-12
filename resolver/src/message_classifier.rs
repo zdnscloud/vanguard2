@@ -1,6 +1,5 @@
 use r53::{
-    header_flag::HeaderFlag, message::SectionType, opcode, question::Question, Message, Name,
-    RData, RRType, Rcode,
+    header_flag::HeaderFlag, message::SectionType, opcode, Message, Name, RData, RRType, Rcode,
 };
 
 #[derive(Debug, Eq, PartialEq)]
@@ -78,6 +77,10 @@ pub fn classify_response(name: &Name, typ: RRType, msg: &Message) -> ResponseCat
     let mut last_name = name;
     let answer_count = answer.len();
     for (i, rrset) in answer.iter().enumerate() {
+        if !rrset.name.eq(last_name) {
+            return ResponseCategory::Invalid("cname doesn't form a chain".to_string());
+        }
+
         if i != answer_count - 1 {
             if rrset.typ != RRType::CNAME {
                 return ResponseCategory::Invalid("cname chain is broken".to_string());
@@ -155,7 +158,7 @@ mod test {
         {
             let raw = from_hex(case.raw);
             let message = Message::from_wire(raw.unwrap().as_ref()).unwrap();
-            let question = assert_eq!(classify_response(&case.qname, case.qtype, &message), case.category,);
+            assert_eq!(classify_response(&case.qname, case.qtype, &message), case.category,);
         }
     }
 }

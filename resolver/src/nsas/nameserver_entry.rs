@@ -6,11 +6,11 @@ use lru::LruCache;
 use r53::Name;
 use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
-    net::{IpAddr, Ipv4Addr, Ipv6Addr},
-    time::{Duration, Instant},
+    net::IpAddr,
+    time::Instant,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Nameserver {
     pub name: Name,
     pub address: IpAddr,
@@ -111,10 +111,17 @@ impl Drop for NameserverEntry {
     }
 }
 
+pub fn select_from_nameservers(nameserver_entries: &Vec<NameserverEntry>) -> Nameserver {
+    nameserver_entries
+        .iter()
+        .map(|s| s.select_nameserver())
+        .min()
+        .unwrap()
+}
+
 mod test {
     use super::*;
-    use lru::LruCache;
-    use r53::Name;
+    use std::net::Ipv4Addr;
 
     #[test]
     fn test_nameserver_cache() {

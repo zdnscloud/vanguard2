@@ -1,10 +1,9 @@
 use crate::nsas::{
-    address_entry::AddressEntry,
     entry_key::EntryKey,
     nameserver_entry::{Nameserver, NameserverCache, NameserverEntry},
 };
+use lru::LruCache;
 use r53::Name;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::{Duration, Instant};
 
 pub struct ZoneEntry {
@@ -12,6 +11,8 @@ pub struct ZoneEntry {
     nameservers: Vec<Name>,
     expire_time: Instant,
 }
+
+pub type ZoneCache = LruCache<EntryKey, ZoneEntry>;
 
 unsafe impl Send for ZoneEntry {}
 

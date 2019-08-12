@@ -6,7 +6,7 @@ use crate::{
     },
 };
 use failure::Result;
-use r53::{message::SectionType, question::Question, Message, Name, RData, RRType, RRset};
+use r53::{message::SectionType, Message, Name, RData, RRType, RRset};
 use std::{net::IpAddr, time::Duration};
 
 pub fn message_to_zone_entry(
@@ -23,16 +23,15 @@ pub fn message_to_zone_entry(
     let answer = msg.take_section(SectionType::Answer).unwrap();
     let glue = msg.take_section(SectionType::Additional);
     let ns_count = answer[0].rdatas.len();
-    let mut names =
-        answer[0]
-            .rdatas
-            .iter()
-            .fold(Vec::with_capacity(ns_count), |mut names, rdata| {
-                if let RData::NS(ref ns) = rdata {
-                    names.push(ns.name.clone());
-                }
-                names
-            });
+    let names = answer[0]
+        .rdatas
+        .iter()
+        .fold(Vec::with_capacity(ns_count), |mut names, rdata| {
+            if let RData::NS(ref ns) = rdata {
+                names.push(ns.name.clone());
+            }
+            names
+        });
 
     if glue.is_none() {
         let zone_entry = ZoneEntry::new(
