@@ -1,10 +1,9 @@
-use crate::cache::MessageCache;
-use crate::entry_key::EntryKey;
-use crate::message_cache_entry::MessageEntry;
-use crate::message_util::can_message_be_cached;
-use crate::rrset_cache::RRsetLruCache;
+use super::{
+    cache::MessageCache, entry_key::EntryKey, message_cache_entry::MessageEntry,
+    message_util::can_message_be_cached, rrset_cache::RRsetLruCache,
+};
 use lru::LruCache;
-use r53::{Message, Name};
+use r53::{Message, Name, RData, RRType, RRset};
 
 const DEFAULT_MESSAGE_CACHE_SIZE: usize = 10000;
 
@@ -32,6 +31,22 @@ impl MessageCache for MessageLruCache {
         self.messages.len()
     }
 
+    fn get_deepest_ns(&mut self, name: &Name) -> Option<Name> {
+        let key = &EntryKey(name as *const Name, RRType::NS);
+        if let Some(mut rrset) = self.positive_cache.get_rrset_with_key(key) {
+            match rrset.rdatas.pop().unwrap() {
+                RData::NS(rdata) => {
+                    return Some(rdata.name);
+                }
+                _ => unreachable!(),
+            }
+        } else if let Ok(parent) = name.parent(1) {
+            return self.get_deepest_ns(&parent);
+        } else {
+            return None;
+        };
+    }
+
     fn gen_response(&mut self, query: &mut Message) -> bool {
         let key = &EntryKey(
             &query.question.as_ref().unwrap().name as *const Name,
@@ -45,7 +60,7 @@ impl MessageCache for MessageLruCache {
             }
             succeed
         } else {
-            false
+            self.positive_cache.gen_response(key, query)
         }
     }
 
@@ -82,7 +97,7 @@ mod tests {
                 .set_flag(header_flag::HeaderFlag::RecursionDesired)
                 .add_answer(RRset::from_str("test.example.com. 3600 IN A 192.0.2.2").unwrap())
                 .add_answer(RRset::from_str("test.example.com. 3600 IN A 192.0.2.1").unwrap())
-                .add_auth(RRset::from_str("example.com. 10 IN NS ns1.example.com.").unwrap())
+                .add_auth(RRset::from_str("example.com. 100 IN NS ns1.example.com.").unwrap())
                 .add_additional(RRset::from_str("ns1.example.com. 3600 IN A 2.2.2.2").unwrap())
                 .edns(Edns {
                     versoin: 0,
@@ -98,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_message_cache() {
-        let mut cache = MessageLruCache::new(10);
+        let mut cache = MessageLruCache::new(100);
         let mut query = Message::with_query(Name::new("test.example.com.").unwrap(), RRType::A);
         assert!(!cache.gen_response(&mut query));
         cache.add_message(build_positive_response());
@@ -116,5 +131,16 @@ mod tests {
         let answers = query.section(SectionType::Answer).unwrap();
         assert_eq!(answers.len(), 1);
         assert_eq!(answers[0].rdatas[0].to_string(), "192.0.2.2");
+
+        let mut query = Message::with_query(Name::new("example.com.").unwrap(), RRType::NS);
+        assert!(cache.gen_response(&mut query));
+        assert_eq!(query.header.an_count, 1);
+
+        let deepest_ns = cache.get_deepest_ns(&Name::new("example.cn.").unwrap());
+        assert!(deepest_ns.is_none());
+
+        let deepest_ns = cache.get_deepest_ns(&Name::new("a.b.c.example.com.").unwrap());
+        assert!(deepest_ns.is_some());
+        assert_eq!(deepest_ns.unwrap(), Name::new("ns1.example.com.").unwrap());
     }
 }

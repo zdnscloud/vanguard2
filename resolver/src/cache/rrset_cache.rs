@@ -1,8 +1,10 @@
-use crate::cache::{RRsetCache, RRsetTrustLevel};
-use crate::entry_key::EntryKey;
-use crate::rrset_cache_entry::RRsetEntry;
+use super::{
+    cache::{RRsetCache, RRsetTrustLevel},
+    entry_key::EntryKey,
+    rrset_cache_entry::RRsetEntry,
+};
 use lru::LruCache;
-use r53::{Name, RRType, RRset};
+use r53::{header_flag::HeaderFlag, Message, MessageBuilder, Name, RRType, RRset};
 
 pub struct RRsetLruCache {
     rrsets: LruCache<EntryKey, RRsetEntry>,
@@ -22,16 +24,7 @@ impl RRsetCache for RRsetLruCache {
     }
 
     fn get_rrset(&mut self, name: &Name, typ: RRType) -> Option<RRset> {
-        let key = &EntryKey(name as *const Name, typ);
-        if let Some(entry) = self.rrsets.get(key) {
-            let rrset = entry.get_rrset();
-            if rrset.is_none() {
-                self.rrsets.pop(key);
-            }
-            rrset
-        } else {
-            None
-        }
+        self.get_rrset_with_key(&EntryKey(name as *const Name, typ))
     }
 
     fn add_rrset(&mut self, rrset: RRset, trust_level: RRsetTrustLevel) {
@@ -44,6 +37,36 @@ impl RRsetCache for RRsetLruCache {
         self.rrsets.pop(key);
         let entry = RRsetEntry::new(rrset, trust_level);
         self.rrsets.put(entry.key(), entry);
+    }
+}
+
+impl RRsetLruCache {
+    pub fn get_rrset_with_key(&mut self, key: &EntryKey) -> Option<RRset> {
+        match self.rrsets.get(key) {
+            Some(entry) => {
+                let rrset = entry.get_rrset();
+                if rrset.is_none() {
+                    self.rrsets.pop(key);
+                }
+                rrset
+            }
+            _ => None,
+        }
+    }
+
+    pub fn gen_response(&mut self, key: &EntryKey, message: &mut Message) -> bool {
+        match self.get_rrset_with_key(key) {
+            Some(rrset) => {
+                let mut builder = MessageBuilder::new(message);
+                builder
+                    .make_response()
+                    .set_flag(HeaderFlag::RecursionAvailable)
+                    .add_answer(rrset)
+                    .done();
+                true
+            }
+            None => false,
+        }
     }
 }
 

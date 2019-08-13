@@ -3,7 +3,6 @@ extern crate tokio;
 mod resolver;
 
 use auth::{AuthServer, DynamicUpdateHandler};
-use cache::MessageLruCache;
 use clap::{App, Arg};
 use forwarder::Forwarder;
 use metrics::start_metric_server;
@@ -57,7 +56,7 @@ fn main() {
         .unwrap_or("114.114.114.114:53");
     let forwarder = Forwarder::new(addr.parse::<SocketAddr>().unwrap());
     let dynamic_server = DynamicUpdateHandler::new(auth_server.zones());
-    let resolver = resolver::Resolver::new(auth_server, forwarder, MessageLruCache::new(0));
+    let resolver = resolver::Resolver::new(auth_server, forwarder);
     let server = Server::new(dns_addr, resolver);
 
     let addr = matches.value_of("rpc_server").unwrap_or("0.0.0.0:5555");

@@ -1,26 +1,21 @@
 use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
     net::{IpAddr, Ipv4Addr},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 const UNREACHABLE_CACHE_TIME: u64 = 5;
-const UNREACHABLE_RTT: u32 = u32::max_value();
+pub(crate) const UNREACHABLE_RTT: u64 = u64::max_value();
 
 #[derive(Clone, Copy)]
 pub struct AddressEntry {
     address: IpAddr,
-    rtt: u32,
-    dead_util: Option<Instant>,
+    rtt: u64,
 }
 
 impl AddressEntry {
-    pub fn new(address: IpAddr, rtt: u32) -> Self {
-        AddressEntry {
-            address,
-            rtt,
-            dead_util: None,
-        }
+    pub fn new(address: IpAddr, rtt: u64) -> Self {
+        AddressEntry { address, rtt }
     }
 
     #[inline]
@@ -37,24 +32,18 @@ impl AddressEntry {
     }
 
     #[inline]
-    pub fn get_rtt(&self) -> u32 {
-        if self.dead_util.is_some() {
-            UNREACHABLE_RTT
-        } else {
-            self.rtt
-        }
+    pub fn get_rtt(&self) -> u64 {
+        self.rtt
     }
 
     #[inline]
-    pub fn set_rtt(&mut self, rtt: u32) {
-        if rtt == UNREACHABLE_RTT {
-            self.dead_util = Some(
-                Instant::now()
-                    .checked_add(Duration::new(UNREACHABLE_CACHE_TIME, 0))
-                    .expect("instant out of range"),
-            );
+    pub fn set_rtt(&mut self, rtt: Duration) {
+        let new = rtt.as_nanos() as u64;
+        if self.rtt == UNREACHABLE_RTT {
+            self.rtt = new
+        } else {
+            self.rtt = ((self.rtt * 3) + (new * 7)) / 10;
         }
-        self.rtt = rtt;
     }
 
     #[inline]
@@ -64,7 +53,7 @@ impl AddressEntry {
 
     #[inline]
     pub fn set_unreachable(&mut self) {
-        self.set_rtt(UNREACHABLE_RTT);
+        self.rtt = UNREACHABLE_RTT;
     }
 
     #[inline]
@@ -121,5 +110,14 @@ mod test {
 
         let target = select_address(&addresses);
         assert_eq!(target.unwrap().get_addr(), Ipv4Addr::new(1, 1, 1, 1));
+
+        let mut addr = AddressEntry::new(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)), 0);
+        addr.set_unreachable();
+        assert_eq!(addr.get_rtt(), UNREACHABLE_RTT);
+        addr.set_rtt(Duration::from_nanos(10));
+        assert_eq!(addr.get_rtt(), 10);
+
+        addr.set_rtt(Duration::from_nanos(70));
+        assert_eq!(addr.get_rtt(), 52);
     }
 }

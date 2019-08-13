@@ -10,6 +10,7 @@ pub enum ResponseCategory {
     NXDomain,
     NXRRset,
     Referral,
+    FormErr,
     Invalid(String),
 }
 
@@ -33,10 +34,16 @@ pub fn classify_response(name: &Name, typ: RRType, msg: &Message) -> ResponseCat
 
     let rcode = msg.header.rcode;
     if rcode != Rcode::NoError {
-        if rcode == Rcode::NXDomain {
-            return ResponseCategory::NXDomain;
-        } else {
-            return ResponseCategory::Invalid("invalid rcode".to_string());
+        match rcode {
+            Rcode::NXDomain => {
+                return ResponseCategory::NXDomain;
+            }
+            Rcode::FormErr => {
+                return ResponseCategory::FormErr;
+            }
+            _ => {
+                return ResponseCategory::Invalid("invalid rcode".to_string());
+            }
         }
     }
 

@@ -6,6 +6,7 @@ use crate::{
     },
     Resolver,
 };
+use failure;
 use futures::{future, prelude::*, Future};
 use r53::{Message, Name, RRType};
 use std::{
@@ -17,7 +18,7 @@ pub struct NameserverFetcher<R> {
     names: Vec<Name>,
     nameservers: Arc<Mutex<NameserverCache>>,
     resolver: R,
-    fut: Option<Box<Future<Item = Message, Error = io::Error> + Send>>,
+    fut: Option<Box<Future<Item = Message, Error = failure::Error> + Send>>,
     current_name: Option<Name>,
     get_any: bool,
 }

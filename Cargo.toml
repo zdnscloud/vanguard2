@@ -16,7 +16,6 @@ failure = { git = "https://github.com/zdnscloud/cement-rs", package = "failure_e
 metrics = { git = "https://github.com/zdnscloud/cement-rs", package = "metrics"}
 datasrc = { path = "datasrc" }
 server = { path = "server" }
-cache = { path = "cache" }
 forwarder = { path = "forwarder" }
 auth = { path = "auth" }
 resolver = { path = "resolver" }

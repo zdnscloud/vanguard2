@@ -1,7 +1,9 @@
-use crate::cache::RRsetCache;
-use crate::entry_key::EntryKey;
-use crate::message_util::{get_rrset_trust_level, is_negative_response};
-use crate::rrset_cache::RRsetLruCache;
+use super::{
+    cache::RRsetCache,
+    entry_key::EntryKey,
+    message_util::{get_rrset_trust_level, is_negative_response},
+    rrset_cache::RRsetLruCache,
+};
 use r53::{
     header_flag::HeaderFlag, message::SectionType, Message, MessageBuilder, Name, RRTtl, RRType,
     RRset,

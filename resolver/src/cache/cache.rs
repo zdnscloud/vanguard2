@@ -23,4 +23,5 @@ pub trait MessageCache {
     fn len(&self) -> usize;
     fn gen_response(&mut self, query: &mut Message) -> bool;
     fn add_message(&mut self, message: Message);
+    fn get_deepest_ns(&mut self, name: &Name) -> Option<Name>;
 }

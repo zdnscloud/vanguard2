@@ -6,5 +6,5 @@ mod message_util;
 mod rrset_cache;
 mod rrset_cache_entry;
 
-pub use crate::cache::MessageCache;
-pub use crate::message_cache::MessageLruCache;
+pub use crate::cache::cache::MessageCache;
+pub use crate::cache::message_cache::MessageLruCache;

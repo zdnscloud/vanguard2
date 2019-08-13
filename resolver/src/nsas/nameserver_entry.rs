@@ -7,14 +7,24 @@ use r53::Name;
 use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
     net::IpAddr,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 #[derive(Clone, Debug)]
 pub struct Nameserver {
     pub name: Name,
     pub address: IpAddr,
-    pub rtt: u32,
+    rtt: Duration,
+}
+
+impl Nameserver {
+    pub fn set_unreachable(&mut self) {
+        self.rtt = Duration::from_nanos(address_entry::UNREACHABLE_RTT);
+    }
+
+    pub fn set_rtt(&mut self, rtt: Duration) {
+        self.rtt = rtt;
+    }
 }
 
 impl PartialEq for Nameserver {
@@ -80,23 +90,14 @@ impl NameserverEntry {
         Nameserver {
             name: self.get_name().clone(),
             address: addr.get_addr(),
-            rtt: addr.get_rtt(),
+            rtt: Duration::from_nanos(addr.get_rtt()),
         }
     }
 
-    pub fn update_address_rtt(&mut self, target: IpAddr, rtt: u32) {
+    pub fn update_nameserver(&mut self, nameserver: &Nameserver) {
         for addr in self.addresses.iter_mut() {
-            if addr.get_addr() == target {
-                addr.set_rtt(rtt);
-                return;
-            }
-        }
-    }
-
-    pub fn set_address_unreachable(&mut self, target: IpAddr) {
-        for addr in self.addresses.iter_mut() {
-            if addr.get_addr() == target {
-                addr.set_unreachable();
+            if addr.get_addr() == nameserver.address {
+                addr.set_rtt(nameserver.rtt);
                 return;
             }
         }

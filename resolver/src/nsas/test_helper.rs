@@ -1,4 +1,5 @@
-use crate::Resolver;
+use crate::{nsas::error::NSASError, Resolver};
+use failure;
 use futures::{future, Future};
 use r53::{
     HeaderFlag, Message, MessageBuilder, Name, Opcode, RData, RRClass, RRTtl, RRType, RRset, Rcode,
@@ -51,13 +52,15 @@ impl Resolver for DumbResolver {
         &self,
         name: Name,
         typ: RRType,
-    ) -> Box<Future<Item = Message, Error = Error> + Send> {
+    ) -> Box<Future<Item = Message, Error = failure::Error> + Send> {
         match self.responses.get(&Question {
             name: name.clone(),
             typ,
         }) {
             None => {
-                return Box::new(future::err(Error::new(ErrorKind::Other, "oh no")));
+                return Box::new(future::err(
+                    NSASError::InvalidNSResponse("time out".to_string()).into(),
+                ));
             }
             Some((ref answer, ref additional)) => {
                 let mut msg = Message::with_query(name.clone(), typ);

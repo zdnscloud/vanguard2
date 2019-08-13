@@ -7,7 +7,7 @@ use crate::{
     },
     Resolver,
 };
-use failure::Result;
+use failure::{self, Result};
 use futures::{future, prelude::*, Future};
 use lru::LruCache;
 use r53::{Message, Name, RRType};
@@ -17,10 +17,13 @@ use std::{
 };
 
 enum FetcherState {
-    FetchNS(Name, Box<Future<Item = Message, Error = io::Error> + Send>),
+    FetchNS(
+        Name,
+        Box<Future<Item = Message, Error = failure::Error> + Send>,
+    ),
     FetchAddress(
         Name,
-        Box<Future<Item = Message, Error = io::Error> + Send>,
+        Box<Future<Item = Message, Error = failure::Error> + Send>,
         Vec<Name>,
     ),
     Poisoned,

@@ -1,4 +1,4 @@
-use crate::cache::RRsetTrustLevel;
+use super::cache::RRsetTrustLevel;
 use r53::{header_flag, message::SectionType, Message, RRType, Rcode};
 
 pub(crate) fn is_negative_response(message: &Message) -> bool {

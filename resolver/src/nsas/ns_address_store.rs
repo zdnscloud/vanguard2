@@ -1,5 +1,6 @@
 use crate::{
     nsas::{
+        address_entry,
         entry_key::EntryKey,
         nameserver_entry::{self, Nameserver, NameserverCache},
         nameserver_fetcher::NameserverFetcher,
@@ -17,24 +18,26 @@ use tokio::executor::spawn;
 const DEFAULT_ZONE_ENTRY_CACHE_SIZE: usize = 1009;
 const DEFAULT_NAMESERVER_ENTRY_CACHE_SIZE: usize = 3001;
 
-pub struct NSAddressStore<R> {
+pub struct NSAddressStore {
     nameservers: Arc<Mutex<NameserverCache>>,
     zones: Arc<Mutex<ZoneCache>>,
-    resolver: R,
 }
 
-impl<R: Resolver + Clone + 'static + Send> NSAddressStore<R> {
-    pub fn new(resolver: R) -> Self {
+impl NSAddressStore {
+    pub fn new() -> Self {
         NSAddressStore {
             nameservers: Arc::new(Mutex::new(LruCache::new(
                 DEFAULT_NAMESERVER_ENTRY_CACHE_SIZE,
             ))),
             zones: Arc::new(Mutex::new(LruCache::new(DEFAULT_ZONE_ENTRY_CACHE_SIZE))),
-            resolver,
         }
     }
 
-    pub fn get_nameserver(&mut self, zone: &Name) -> Box<Future<Item = Nameserver, Error = ()>> {
+    pub fn get_nameserver<R: Resolver + Clone + 'static + Send>(
+        &self,
+        zone: &Name,
+        resolver: R,
+    ) -> Box<Future<Item = Nameserver, Error = ()>> {
         let (nameserver, missing_nameserver) = {
             let key = &EntryKey::from_name(zone);
             let mut zones = self.zones.lock().unwrap();
@@ -50,25 +53,25 @@ impl<R: Resolver + Clone + 'static + Send> NSAddressStore<R> {
                 spawn(NameserverFetcher::new(
                     missing_nameserver,
                     self.nameservers.clone(),
-                    self.resolver.clone(),
+                    resolver,
                 ));
             }
             return Box::new(future::ok(nameserver.unwrap()));
         } else {
             return Box::new(ZoneFetcher::new(
                 zone.clone(),
-                self.resolver.clone(),
+                resolver,
                 self.nameservers.clone(),
                 self.zones.clone(),
             ));
         }
     }
 
-    pub fn set_nameserver_rtt(&mut self, nameserver: &Nameserver) {
+    pub fn update_nameserver_rtt(&self, nameserver: &Nameserver) {
         let mut nameservers = self.nameservers.lock().unwrap();
         let key = &EntryKey::from_name(&nameserver.name);
         if let Some(entry) = nameservers.get_mut(key) {
-            entry.update_address_rtt(nameserver.address, nameserver.rtt);
+            entry.update_nameserver(nameserver);
         }
     }
 }

@@ -1,5 +1,4 @@
-use crate::cache::RRsetTrustLevel;
-use crate::entry_key::EntryKey;
+use super::{cache::RRsetTrustLevel, entry_key::EntryKey};
 use r53::{Name, RData, RRClass, RRTtl, RRType, RRset};
 use std::time::{Duration, Instant};
 
