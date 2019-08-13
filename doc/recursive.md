@@ -3,7 +3,7 @@
 2. lookup rrset cache, if has rrset, build the response and return
 3. lookup message cache again, 
    1. if found use it as a intermidiate response goto step 4
-   1. else goto step 5, 
+   1. else use cache to find the possible closest enclosure zone as `current_zone` and go to step 5
 4. classify the response and handle it
    1. Answer, AnswerCName
      1. update cache
@@ -16,17 +16,17 @@
      1. use it as response
    1. Referal
      1. update the cache 
-     1. if return ns record is current_zone's subdomain, use it as new current_zone
-       - get address of the new zone from nsas cache, if get the address goto step 5
-       - else return serverfail
-     1. if return ns isn't valid, return the response
+     1. if return ns record is current_zone's subdomain, use it as new `current_zone`
+       - goto step 5
+     1. else return the response
    1. truncate answer
      1. if current protocol is udp, use tcp to send
      1. else return server failed
    1. Format error
      1. if current protocol is udp and edns used, retry with edns disable
      1. else return server failed
-5. use cache to find the possible closest enclosure zone and send the query to the nameserver
+5. use NSAS to find the address of nameserver of `current_zone`, if not found, return server failed
+, else send the query to the nameserver
   1. if get response, goto step 4
   1. else return server failed
 
