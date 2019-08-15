@@ -1,5 +1,5 @@
 use super::{
-    cache::MessageCache, entry_key::EntryKey, message_cache_entry::MessageEntry,
+    cache::RRsetTrustLevel, entry_key::EntryKey, message_cache_entry::MessageEntry,
     message_util::can_message_be_cached, rrset_cache::RRsetLruCache,
 };
 use lru::LruCache;
@@ -9,8 +9,7 @@ const DEFAULT_MESSAGE_CACHE_SIZE: usize = 10000;
 
 pub struct MessageLruCache {
     messages: LruCache<EntryKey, MessageEntry>,
-    positive_cache: RRsetLruCache,
-    negative_cache: RRsetLruCache,
+    rrset_cache: RRsetLruCache,
 }
 
 impl MessageLruCache {
@@ -20,26 +19,18 @@ impl MessageLruCache {
         }
         MessageLruCache {
             messages: LruCache::new(cap),
-            positive_cache: RRsetLruCache::new(2 * cap),
-            negative_cache: RRsetLruCache::new(cap),
+            rrset_cache: RRsetLruCache::new(2 * cap),
         }
     }
-}
 
-impl MessageCache for MessageLruCache {
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.messages.len()
     }
 
-    fn get_deepest_ns(&mut self, name: &Name) -> Option<Name> {
+    pub fn get_deepest_ns(&mut self, name: &Name) -> Option<Name> {
         let key = &EntryKey(name as *const Name, RRType::NS);
-        if let Some(mut rrset) = self.positive_cache.get_rrset_with_key(key) {
-            match rrset.rdatas.pop().unwrap() {
-                RData::NS(rdata) => {
-                    return Some(rdata.name);
-                }
-                _ => unreachable!(),
-            }
+        if self.rrset_cache.has_rrset(key) {
+            return Some(name.clone());
         } else if let Ok(parent) = name.parent(1) {
             return self.get_deepest_ns(&parent);
         } else {
@@ -47,35 +38,36 @@ impl MessageCache for MessageLruCache {
         };
     }
 
-    fn gen_response(&mut self, query: &mut Message) -> bool {
+    pub fn gen_response(&mut self, query: &mut Message) -> bool {
         let key = &EntryKey(
             &query.question.as_ref().unwrap().name as *const Name,
             query.question.as_ref().unwrap().typ,
         );
         if let Some(entry) = self.messages.get(key) {
-            let succeed =
-                entry.fill_message(query, &mut self.positive_cache, &mut self.negative_cache);
+            let succeed = entry.fill_message(query, &mut self.rrset_cache);
             if !succeed {
                 self.messages.pop(key);
             }
             succeed
         } else {
-            self.positive_cache.gen_response(key, query)
+            self.rrset_cache.gen_response(key, query)
         }
     }
 
-    fn add_message(&mut self, message: Message) {
-        if !can_message_be_cached(&message) {
-            return;
-        }
-
-        let key = &EntryKey(
-            &message.question.as_ref().unwrap().name as *const Name,
-            message.question.as_ref().unwrap().typ,
-        );
-        self.messages.pop(key);
-        let entry = MessageEntry::new(message, &mut self.positive_cache, &mut self.negative_cache);
+    pub fn add_response(&mut self, message: Message) {
+        let entry = MessageEntry::new(message, &mut self.rrset_cache);
+        //keep k,v in pair, couldn't old key, since name in old key point to old value
+        //which will be cleaned after the update
+        self.messages.pop(&entry.key());
         self.messages.put(entry.key(), entry);
+    }
+
+    pub fn add_rrset_in_response(&mut self, message: Message) {
+        MessageEntry::new(message, &mut self.rrset_cache);
+    }
+
+    pub fn add_rrset(&mut self, rrset: RRset, trust_level: RRsetTrustLevel) {
+        self.rrset_cache.add_rrset(rrset, trust_level);
     }
 }
 
@@ -116,7 +108,7 @@ mod tests {
         let mut cache = MessageLruCache::new(100);
         let mut query = Message::with_query(Name::new("test.example.com.").unwrap(), RRType::A);
         assert!(!cache.gen_response(&mut query));
-        cache.add_message(build_positive_response());
+        cache.add_response(build_positive_response());
         assert!(cache.gen_response(&mut query));
         assert_eq!(query.header.rcode, Rcode::NoError);
         assert!(header_flag::is_flag_set(
@@ -141,6 +133,6 @@ mod tests {
 
         let deepest_ns = cache.get_deepest_ns(&Name::new("a.b.c.example.com.").unwrap());
         assert!(deepest_ns.is_some());
-        assert_eq!(deepest_ns.unwrap(), Name::new("ns1.example.com.").unwrap());
+        assert_eq!(deepest_ns.unwrap(), Name::new("example.com.").unwrap());
     }
 }

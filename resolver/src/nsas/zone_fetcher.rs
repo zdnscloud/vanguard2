@@ -1,8 +1,8 @@
 use crate::{
     nsas::{
+        error,
         message_util::{message_to_nameserver_entry, message_to_zone_entry},
         nameserver_entry::{self, Nameserver, NameserverCache},
-        nameserver_fetcher::NameserverFetcher,
         zone_entry::ZoneCache,
     },
     Resolver,
@@ -45,7 +45,10 @@ impl<R: Resolver> ZoneFetcher<R> {
     ) -> Self {
         let zone_copy = zone.clone();
         ZoneFetcher {
-            state: FetcherState::FetchNS(zone, resolver.resolve(zone_copy, RRType::NS)),
+            state: FetcherState::FetchNS(
+                zone,
+                resolver.resolve(Message::with_query(zone_copy, RRType::NS)),
+            ),
             resolver,
             nameservers,
             zones,
@@ -55,14 +58,14 @@ impl<R: Resolver> ZoneFetcher<R> {
 
 impl<R: Resolver> Future for ZoneFetcher<R> {
     type Item = Nameserver;
-    type Error = ();
+    type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             match mem::replace(&mut self.state, FetcherState::Poisoned) {
                 FetcherState::FetchNS(zone, mut fut) => match fut.poll() {
-                    Err(_) => {
-                        return Err(());
+                    Err(e) => {
+                        return Err(e);
                     }
                     Ok(Async::NotReady) => {
                         self.state = FetcherState::FetchNS(zone, fut);
@@ -99,17 +102,24 @@ impl<R: Resolver> Future for ZoneFetcher<R> {
 
                                 debug_assert!(!missing_names.is_empty());
                                 let name = missing_names.pop().unwrap();
-                                let fut = self.resolver.resolve(name.clone(), RRType::A);
+                                let fut = self
+                                    .resolver
+                                    .resolve(Message::with_query(name.clone(), RRType::A));
                                 self.state = FetcherState::FetchAddress(name, fut, missing_names);
                             }
                         } else {
-                            return Err(());
+                            return Err(error::NSASError::InvalidNSResponse(
+                                "not valid ns response".to_string(),
+                            )
+                            .into());
                         }
                     }
                 },
                 FetcherState::FetchAddress(current_name, mut fut, mut names) => {
                     match fut.poll() {
-                        Err(_) => {}
+                        Err(e) => {
+                            println!("fetch {:?} failed {:?}", current_name, e);
+                        }
                         Ok(Async::NotReady) => {
                             self.state = FetcherState::FetchAddress(current_name, fut, names);
                             return Ok(Async::NotReady);
@@ -126,11 +136,13 @@ impl<R: Resolver> Future for ZoneFetcher<R> {
                     }
 
                     if names.is_empty() {
-                        return Err(());
+                        return Err(error::NSASError::NoValidNameserver.into());
                     }
 
                     let current_name = names.pop().unwrap();
-                    let fut = self.resolver.resolve(current_name.clone(), RRType::A);
+                    let fut = self
+                        .resolver
+                        .resolve(Message::with_query(current_name.clone(), RRType::A));
                     self.state = FetcherState::FetchAddress(current_name, fut, names);
                 }
                 FetcherState::Poisoned => panic!("zone fetcher state panic inside pool"),

@@ -11,7 +11,4 @@ pub enum RecursorError {
 
     #[fail(display = "timer error {}", _0)]
     TimerErr(String),
-
-    #[fail(display = "no name server is found")]
-    NoNameserver,
 }

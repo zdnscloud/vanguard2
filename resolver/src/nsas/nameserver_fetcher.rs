@@ -1,6 +1,7 @@
 use crate::{
     nsas::{
         entry_key::EntryKey,
+        error::NSASError,
         message_util::{message_to_nameserver_entry, message_to_zone_entry},
         nameserver_entry::{Nameserver, NameserverCache, NameserverEntry},
     },
@@ -38,7 +39,7 @@ impl<R: Resolver> NameserverFetcher<R> {
 
 impl<R: Resolver> Future for NameserverFetcher<R> {
     type Item = ();
-    type Error = ();
+    type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
@@ -48,11 +49,14 @@ impl<R: Resolver> Future for NameserverFetcher<R> {
                     if self.get_any {
                         return Ok(Async::Ready(()));
                     } else {
-                        return Err(());
+                        return Err(NSASError::NoValidNameserver.into());
                     }
                 } else {
                     let name = name.unwrap();
-                    self.fut = Some(self.resolver.resolve(name.clone(), RRType::A));
+                    self.fut = Some(
+                        self.resolver
+                            .resolve(Message::with_query(name.clone(), RRType::A)),
+                    );
                     self.current_name = Some(name);
                 }
             }

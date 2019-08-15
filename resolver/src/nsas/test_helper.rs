@@ -50,9 +50,11 @@ impl DumbResolver {
 impl Resolver for DumbResolver {
     fn resolve(
         &self,
-        name: Name,
-        typ: RRType,
+        mut query: Message,
     ) -> Box<Future<Item = Message, Error = failure::Error> + Send> {
+        let question = query.question.as_ref().unwrap();
+        let name = question.name.clone();
+        let typ = question.typ;
         match self.responses.get(&Question {
             name: name.clone(),
             typ,
@@ -63,10 +65,9 @@ impl Resolver for DumbResolver {
                 ));
             }
             Some((ref answer, ref additional)) => {
-                let mut msg = Message::with_query(name.clone(), typ);
-                let mut builder = MessageBuilder::new(&mut msg);
+                let mut builder = MessageBuilder::new(&mut query);
                 builder
-                    .id(1200)
+                    .make_response()
                     .opcode(Opcode::Query)
                     .rcode(Rcode::NoError)
                     .set_flag(HeaderFlag::QueryRespone)
@@ -86,7 +87,7 @@ impl Resolver for DumbResolver {
                     builder.add_additional(rrset.clone());
                 }
                 builder.done();
-                return Box::new(future::ok(msg));
+                return Box::new(future::ok(query));
             }
         }
     }

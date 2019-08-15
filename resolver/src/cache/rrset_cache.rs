@@ -1,8 +1,4 @@
-use super::{
-    cache::{RRsetCache, RRsetTrustLevel},
-    entry_key::EntryKey,
-    rrset_cache_entry::RRsetEntry,
-};
+use super::{cache::RRsetTrustLevel, entry_key::EntryKey, rrset_cache_entry::RRsetEntry};
 use lru::LruCache;
 use r53::{header_flag::HeaderFlag, Message, MessageBuilder, Name, RRType, RRset};
 
@@ -16,31 +12,11 @@ impl RRsetLruCache {
             rrsets: LruCache::new(cap),
         }
     }
-}
 
-impl RRsetCache for RRsetLruCache {
-    fn len(&self) -> usize {
-        self.rrsets.len()
+    pub fn has_rrset(&self, key: &EntryKey) -> bool {
+        self.rrsets.contains(key)
     }
 
-    fn get_rrset(&mut self, name: &Name, typ: RRType) -> Option<RRset> {
-        self.get_rrset_with_key(&EntryKey(name as *const Name, typ))
-    }
-
-    fn add_rrset(&mut self, rrset: RRset, trust_level: RRsetTrustLevel) {
-        let key = &EntryKey(&rrset.name as *const Name, rrset.typ);
-        if let Some(entry) = self.rrsets.peek(key) {
-            if !entry.is_expired() && entry.trust_level > trust_level {
-                return;
-            }
-        }
-        self.rrsets.pop(key);
-        let entry = RRsetEntry::new(rrset, trust_level);
-        self.rrsets.put(entry.key(), entry);
-    }
-}
-
-impl RRsetLruCache {
     pub fn get_rrset_with_key(&mut self, key: &EntryKey) -> Option<RRset> {
         match self.rrsets.get(key) {
             Some(entry) => {
@@ -67,6 +43,26 @@ impl RRsetLruCache {
             }
             None => false,
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.rrsets.len()
+    }
+
+    pub fn get_rrset(&mut self, name: &Name, typ: RRType) -> Option<RRset> {
+        self.get_rrset_with_key(&EntryKey(name as *const Name, typ))
+    }
+
+    pub fn add_rrset(&mut self, rrset: RRset, trust_level: RRsetTrustLevel) {
+        let key = &EntryKey(&rrset.name as *const Name, rrset.typ);
+        if let Some(entry) = self.rrsets.peek(key) {
+            if !entry.is_expired() && entry.trust_level > trust_level {
+                return;
+            }
+        }
+        self.rrsets.pop(key);
+        let entry = RRsetEntry::new(rrset, trust_level);
+        self.rrsets.put(entry.key(), entry);
     }
 }
 

@@ -1,13 +1,13 @@
 use crate::{
-    error::RecursorError,
+    common_error::RecursorError,
     nsas::{NSAddressStore, Nameserver},
 };
 use failure;
-use futures::{future, prelude::*, Future};
+use futures::{prelude::*, Future};
 use r53::{Message, MessageRender};
 use std::{
     error::Error,
-    io, mem,
+    mem,
     net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant},
@@ -37,6 +37,10 @@ pub struct Sender {
 
 impl Sender {
     pub fn new(query: Message, nameserver: Nameserver, nsas: Arc<NSAddressStore>) -> Self {
+        println!(
+            "send query {:?} in zone {:?} to {:?} ",
+            query.question, nameserver.name, nameserver.address
+        );
         Sender {
             query,
             nameserver,
@@ -99,18 +103,18 @@ impl Future for Sender {
                             return Ok(Async::NotReady);
                         }
                     },
-                    Ok(Async::Ready((_, buf, size, _))) => match Message::from_wire(&buf[..size]) {
-                        Ok(resp) => {
-                            self.nameserver.set_rtt(send_time.elapsed());
-                            self.nsas.update_nameserver_rtt(&self.nameserver);
-                            return Ok(Async::Ready(resp));
+                    Ok(Async::Ready((_, buf, size, _))) => {
+                        self.nameserver.set_rtt(send_time.elapsed());
+                        self.nsas.update_nameserver_rtt(&self.nameserver);
+                        match Message::from_wire(&buf[..size]) {
+                            Ok(resp) => {
+                                return Ok(Async::Ready(resp));
+                            }
+                            Err(err) => {
+                                return Err(err);
+                            }
                         }
-                        Err(err) => {
-                            self.nameserver.set_unreachable();
-                            self.nsas.update_nameserver_rtt(&self.nameserver);
-                            return Err(err);
-                        }
-                    },
+                    }
                 },
                 State::Poisoned => panic!("inside sender pool"),
             }

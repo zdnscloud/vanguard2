@@ -9,6 +9,7 @@ use crate::{
     },
     Resolver,
 };
+use failure;
 use futures::{future, prelude::*, Future};
 use lru::LruCache;
 use r53::Name;
@@ -18,6 +19,7 @@ use tokio::executor::spawn;
 const DEFAULT_ZONE_ENTRY_CACHE_SIZE: usize = 1009;
 const DEFAULT_NAMESERVER_ENTRY_CACHE_SIZE: usize = 3001;
 
+#[derive(Clone)]
 pub struct NSAddressStore {
     nameservers: Arc<Mutex<NameserverCache>>,
     zones: Arc<Mutex<ZoneCache>>,
@@ -37,7 +39,7 @@ impl NSAddressStore {
         &self,
         zone: &Name,
         resolver: R,
-    ) -> Box<Future<Item = Nameserver, Error = ()>> {
+    ) -> Box<Future<Item = Nameserver, Error = failure::Error> + Send + 'static> {
         let (nameserver, missing_nameserver) = {
             let key = &EntryKey::from_name(zone);
             let mut zones = self.zones.lock().unwrap();
@@ -50,11 +52,10 @@ impl NSAddressStore {
 
         if nameserver.is_some() {
             if !missing_nameserver.is_empty() {
-                spawn(NameserverFetcher::new(
-                    missing_nameserver,
-                    self.nameservers.clone(),
-                    resolver,
-                ));
+                spawn(
+                    NameserverFetcher::new(missing_nameserver, self.nameservers.clone(), resolver)
+                        .map_err(|e| println!("query missing nameserver failed:{:?}", e)),
+                );
             }
             return Box::new(future::ok(nameserver.unwrap()));
         } else {
