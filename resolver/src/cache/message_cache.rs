@@ -1,6 +1,6 @@
 use super::{
     cache::RRsetTrustLevel, entry_key::EntryKey, message_cache_entry::MessageEntry,
-    message_util::can_message_be_cached, rrset_cache::RRsetLruCache,
+    rrset_cache::RRsetLruCache,
 };
 use lru::LruCache;
 use r53::{Message, Name, RData, RRType, RRset};

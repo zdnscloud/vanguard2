@@ -2,9 +2,9 @@ use crate::{
     nsas::{
         address_entry,
         entry_key::EntryKey,
-        nameserver_entry::{self, Nameserver, NameserverCache},
+        nameserver_cache::{self, Nameserver, NameserverCache},
         nameserver_fetcher::NameserverFetcher,
-        zone_entry::ZoneCache,
+        zone_cache::ZoneCache,
         zone_fetcher::ZoneFetcher,
     },
     Resolver,
@@ -28,10 +28,12 @@ pub struct NSAddressStore {
 impl NSAddressStore {
     pub fn new() -> Self {
         NSAddressStore {
-            nameservers: Arc::new(Mutex::new(LruCache::new(
+            nameservers: Arc::new(Mutex::new(NameserverCache(LruCache::new(
                 DEFAULT_NAMESERVER_ENTRY_CACHE_SIZE,
-            ))),
-            zones: Arc::new(Mutex::new(LruCache::new(DEFAULT_ZONE_ENTRY_CACHE_SIZE))),
+            )))),
+            zones: Arc::new(Mutex::new(ZoneCache(LruCache::new(
+                DEFAULT_ZONE_ENTRY_CACHE_SIZE,
+            )))),
         }
     }
 
@@ -39,7 +41,7 @@ impl NSAddressStore {
         let (nameserver, missing_nameserver) = {
             let key = &EntryKey::from_name(zone);
             let mut zones = self.zones.lock().unwrap();
-            if let Some(entry) = zones.get(key) {
+            if let Some(entry) = zones.get_zone(key) {
                 entry.select_nameserver(&mut self.nameservers.lock().unwrap())
             } else {
                 (None, Vec::new())
@@ -72,7 +74,7 @@ impl NSAddressStore {
     pub fn update_nameserver_rtt(&self, nameserver: &Nameserver) {
         let mut nameservers = self.nameservers.lock().unwrap();
         let key = &EntryKey::from_name(&nameserver.name);
-        if let Some(entry) = nameservers.get_mut(key) {
+        if let Some(entry) = nameservers.get_nameserver_mut(key) {
             entry.update_nameserver(nameserver);
         }
     }

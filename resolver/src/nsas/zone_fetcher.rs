@@ -2,8 +2,8 @@ use crate::{
     nsas::{
         error,
         message_util::{message_to_nameserver_entry, message_to_zone_entry},
-        nameserver_entry::{self, Nameserver, NameserverCache},
-        zone_entry::ZoneCache,
+        nameserver_cache::{self, Nameserver, NameserverCache},
+        zone_cache::ZoneCache,
     },
     Resolver,
 };
@@ -78,13 +78,13 @@ impl<R: Resolver> Future for ZoneFetcher<R> {
                             if let Some(nameserver_entries) = nameserver_entries {
                                 {
                                     let mut zones = self.zones.lock().unwrap();
-                                    zones.put(zone_entry.get_key(), zone_entry);
+                                    zones.add_zone(zone_entry);
                                 }
                                 let nameserver =
-                                    nameserver_entry::select_from_nameservers(&nameserver_entries);
+                                    nameserver_cache::select_from_nameservers(&nameserver_entries);
                                 let mut nameservers = self.nameservers.lock().unwrap();
                                 for nameserver_entry in nameserver_entries {
-                                    nameservers.put(nameserver_entry.get_key(), nameserver_entry);
+                                    nameservers.add_nameserver(nameserver_entry);
                                 }
                                 return Ok(Async::Ready(nameserver));
                             } else {
@@ -94,7 +94,7 @@ impl<R: Resolver> Future for ZoneFetcher<R> {
                                 };
                                 {
                                     let mut zones = self.zones.lock().unwrap();
-                                    zones.put(zone_entry.get_key(), zone_entry);
+                                    zones.add_zone(zone_entry);
                                 }
                                 if let Some(nameserver) = nameserver {
                                     return Ok(Async::Ready(nameserver));
@@ -129,7 +129,7 @@ impl<R: Resolver> Future for ZoneFetcher<R> {
                                 message_to_nameserver_entry(current_name.clone(), msg)
                             {
                                 let nameserver = entry.select_nameserver();
-                                self.nameservers.lock().unwrap().put(entry.get_key(), entry);
+                                self.nameservers.lock().unwrap().add_nameserver(entry);
                                 return Ok(Async::Ready(nameserver));
                             }
                         }
@@ -178,8 +178,8 @@ mod test {
             ],
         );
 
-        let nameservers = Arc::new(Mutex::new(LruCache::new(100)));
-        let zones = Arc::new(Mutex::new(LruCache::new(100)));
+        let nameservers = Arc::new(Mutex::new(NameserverCache(LruCache::new(100))));
+        let zones = Arc::new(Mutex::new(ZoneCache(LruCache::new(100))));
 
         let fetcher = ZoneFetcher::new(
             Name::new("knet.cn").unwrap(),
@@ -222,8 +222,8 @@ mod test {
             Vec::new(),
         );
 
-        let nameservers = Arc::new(Mutex::new(LruCache::new(100)));
-        let zones = Arc::new(Mutex::new(LruCache::new(100)));
+        let nameservers = Arc::new(Mutex::new(NameserverCache(LruCache::new(100))));
+        let zones = Arc::new(Mutex::new(ZoneCache(LruCache::new(100))));
         let fetcher = ZoneFetcher::new(
             Name::new("knet.cn").unwrap(),
             resolver,

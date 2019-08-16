@@ -46,6 +46,14 @@ impl Resolver {
             })
             .unwrap();
         cache.add_rrset(root, RRsetTrustLevel::AuthorityWithAA);
+        cache.add_rrset(
+            RRset::from_str("j.root-servers.net. 518400 IN A 192.58.128.30").unwrap(),
+            RRsetTrustLevel::AuthorityWithAA,
+        );
+        cache.add_rrset(
+            RRset::from_str("a.root-servers.net. 518400 IN A 198.41.0.4").unwrap(),
+            RRsetTrustLevel::AuthorityWithAA,
+        );
         let recursor = Recursor::new(cache);
         Resolver {
             auth,

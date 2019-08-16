@@ -1,8 +1,4 @@
-use super::{
-    entry_key::EntryKey,
-    message_util::{get_rrset_trust_level, is_negative_response},
-    rrset_cache::RRsetLruCache,
-};
+use super::{entry_key::EntryKey, message_util::get_rrset_trust_level, rrset_cache::RRsetLruCache};
 use r53::{
     header_flag::HeaderFlag, message::SectionType, Message, MessageBuilder, Name, RRTtl, RRType,
     RRset,

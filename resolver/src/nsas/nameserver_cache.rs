@@ -53,9 +53,29 @@ pub struct NameserverEntry {
     expire_time: Instant,
 }
 
-pub type NameserverCache = LruCache<EntryKey, NameserverEntry>;
+pub struct NameserverCache(pub LruCache<EntryKey, NameserverEntry>);
 
 unsafe impl Send for NameserverEntry {}
+
+impl NameserverCache {
+    pub fn add_nameserver(&mut self, entry: NameserverEntry) {
+        let key = entry.get_key();
+        self.0.pop(&key);
+        self.0.put(key, entry);
+    }
+
+    pub fn get_nameserver(&mut self, key: &EntryKey) -> Option<&NameserverEntry> {
+        self.0.get(key)
+    }
+
+    pub fn get_nameserver_mut(&mut self, key: &EntryKey) -> Option<&mut NameserverEntry> {
+        self.0.get_mut(key)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
 
 impl NameserverEntry {
     pub fn new(name: Name, addresses: Vec<AddressEntry>) -> Self {
@@ -126,17 +146,17 @@ mod test {
 
     #[test]
     fn test_nameserver_cache() {
-        let mut cache: NameserverCache = LruCache::new(10);
+        let mut cache = NameserverCache(LruCache::new(10));
 
         let entry = NameserverEntry::new(
             Name::new("n1").unwrap(),
             vec![AddressEntry::new(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)), 0)],
         );
-        cache.put(entry.get_key(), entry);
+        cache.add_nameserver(entry);
 
         let name = Name::new("n1").unwrap();
         let key = EntryKey::from_name(&name);
-        let entry = cache.get(&key);
+        let entry = cache.get_nameserver(&key);
         assert!(entry.is_some());
     }
 }

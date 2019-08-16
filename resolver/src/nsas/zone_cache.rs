@@ -1,6 +1,6 @@
 use crate::nsas::{
     entry_key::EntryKey,
-    nameserver_entry::{Nameserver, NameserverCache, NameserverEntry},
+    nameserver_cache::{Nameserver, NameserverCache, NameserverEntry},
 };
 use lru::LruCache;
 use r53::Name;
@@ -12,7 +12,23 @@ pub struct ZoneEntry {
     expire_time: Instant,
 }
 
-pub type ZoneCache = LruCache<EntryKey, ZoneEntry>;
+pub struct ZoneCache(pub LruCache<EntryKey, ZoneEntry>);
+
+impl ZoneCache {
+    pub fn add_zone(&mut self, entry: ZoneEntry) {
+        let key = entry.get_key();
+        self.0.pop(&key);
+        self.0.put(key, entry);
+    }
+
+    pub fn get_zone(&mut self, key: &EntryKey) -> Option<&ZoneEntry> {
+        self.0.get(key)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+}
 
 unsafe impl Send for ZoneEntry {}
 
@@ -43,7 +59,7 @@ impl ZoneEntry {
             let name = missing_names.swap_remove(i);
             let key = &EntryKey::from_name(&name);
             let mut nameserver_is_healthy = false;
-            if let Some(entry) = nameservers.get(key) {
+            if let Some(entry) = nameservers.get_nameserver(key) {
                 servers.push(entry.select_nameserver());
                 nameserver_is_healthy = true;
             }

@@ -253,7 +253,9 @@ impl Future for RunningQuery {
                         }
                     },
                 },
-                State::Poisoned => panic!("running query state is corrupted"),
+                State::Poisoned => {
+                    panic!("running query state is corrupted");
+                }
             }
         }
     }

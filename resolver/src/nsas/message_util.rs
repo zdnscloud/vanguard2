@@ -1,8 +1,8 @@
 use crate::{
     message_classifier::{classify_response, ResponseCategory},
     nsas::{
-        address_entry::AddressEntry, error::NSASError, nameserver_entry::NameserverEntry,
-        zone_entry::ZoneEntry,
+        address_entry::AddressEntry, error::NSASError, nameserver_cache::NameserverEntry,
+        zone_cache::ZoneEntry,
     },
 };
 use failure::Result;

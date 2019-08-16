@@ -25,7 +25,7 @@ impl Copy for EntryKey {}
 
 impl Debug for EntryKey {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        unsafe { write!(f, "{}", (*self.0)) }
+        unsafe { write!(f, "{:?}, {}", self.0, *self.0) }
     }
 }
 

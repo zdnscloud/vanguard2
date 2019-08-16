@@ -3,7 +3,7 @@ use crate::{
         entry_key::EntryKey,
         error::NSASError,
         message_util::{message_to_nameserver_entry, message_to_zone_entry},
-        nameserver_entry::{Nameserver, NameserverCache, NameserverEntry},
+        nameserver_cache::{Nameserver, NameserverCache, NameserverEntry},
     },
     Resolver,
 };
@@ -70,7 +70,7 @@ impl<R: Resolver> Future for NameserverFetcher<R> {
                     if let Ok(entry) =
                         message_to_nameserver_entry(self.current_name.take().unwrap(), msg)
                     {
-                        self.nameservers.lock().unwrap().put(entry.get_key(), entry);
+                        self.nameservers.lock().unwrap().add_nameserver(entry);
                         self.get_any = true;
                     }
                 }
@@ -106,7 +106,7 @@ mod test {
             );
         }
 
-        let nameservers = Arc::new(Mutex::new(LruCache::new(100)));
+        let nameservers = Arc::new(Mutex::new(NameserverCache(LruCache::new(100))));
 
         let mut fetcher = NameserverFetcher::new(names, nameservers.clone(), resolver);
         assert_eq!(nameservers.lock().unwrap().len(), 0);
