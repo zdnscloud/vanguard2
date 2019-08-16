@@ -35,11 +35,7 @@ impl NSAddressStore {
         }
     }
 
-    pub fn get_nameserver<R: Resolver + Clone + 'static + Send>(
-        &self,
-        zone: &Name,
-        resolver: R,
-    ) -> Box<Future<Item = Nameserver, Error = failure::Error> + Send + 'static> {
+    pub fn get_nameserver(&self, zone: &Name) -> Option<(Nameserver, Vec<Name>)> {
         let (nameserver, missing_nameserver) = {
             let key = &EntryKey::from_name(zone);
             let mut zones = self.zones.lock().unwrap();
@@ -51,21 +47,26 @@ impl NSAddressStore {
         };
 
         if nameserver.is_some() {
-            if !missing_nameserver.is_empty() {
-                spawn(
-                    NameserverFetcher::new(missing_nameserver, self.nameservers.clone(), resolver)
-                        .map_err(|e| println!("query missing nameserver failed:{:?}", e)),
-                );
-            }
-            return Box::new(future::ok(nameserver.unwrap()));
+            Some((nameserver.unwrap(), missing_nameserver))
         } else {
-            return Box::new(ZoneFetcher::new(
-                zone.clone(),
-                resolver,
-                self.nameservers.clone(),
-                self.zones.clone(),
-            ));
+            None
         }
+    }
+
+    pub fn fetch_nameservers<R: Resolver + Clone + 'static + Send>(
+        &self,
+        nameservers: Vec<Name>,
+        resolver: R,
+    ) -> NameserverFetcher<R> {
+        NameserverFetcher::new(nameservers, self.nameservers.clone(), resolver)
+    }
+
+    pub fn fetch_zone<R: Resolver + Clone + 'static + Send>(
+        &self,
+        zone: Name,
+        resolver: R,
+    ) -> ZoneFetcher<R> {
+        return ZoneFetcher::new(zone, resolver, self.nameservers.clone(), self.zones.clone());
     }
 
     pub fn update_nameserver_rtt(&self, nameserver: &Nameserver) {

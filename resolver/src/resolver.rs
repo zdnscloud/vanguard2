@@ -32,7 +32,7 @@ impl Recursor {
     ) -> Box<Future<Item = Done, Error = failure::Error> + Send + 'static> {
         let client = query.client;
         Box::new(
-            self.resolve(query.message)
+            RunningQuery::new(query.message, self.clone())
                 .map(move |message| Done(Query { client, message })),
         )
     }
@@ -43,6 +43,6 @@ impl Resolver for Recursor {
         &self,
         query: Message,
     ) -> Box<Future<Item = Message, Error = failure::Error> + Send + 'static> {
-        RunningQuery::new(query, self.clone()).resolve()
+        Box::new(RunningQuery::new(query, self.clone()))
     }
 }

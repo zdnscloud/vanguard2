@@ -1,20 +1,32 @@
 use crate::{
     error::RecursorError,
     message_classifier::{classify_response, ResponseCategory},
+    nsas::ZoneFetcher,
     resolver::Recursor,
     sender::Sender,
 };
-use futures::{future, Future};
+use failure;
+use futures::{future, prelude::*, Future};
 use r53::{message::SectionType, name, Message, MessageBuilder, Name, RData, RRType, Rcode};
 use std::mem;
+use tokio::executor::spawn;
+
+enum State {
+    Init,
+    GetNameServer(ZoneFetcher<Recursor>),
+    QueryAuthServer(Sender),
+    Poisoned,
+}
 
 pub struct RunningQuery {
     current_name: Name,
     current_type: RRType,
     current_zone: Option<Name>,
     cname_depth: usize,
-    response: Message,
+    query: Option<Message>,
+    response: Option<Message>,
     recursor: Recursor,
+    state: State,
 }
 
 impl RunningQuery {
@@ -27,72 +39,38 @@ impl RunningQuery {
             current_type,
             current_zone: None,
             cname_depth: 0,
-            response: query,
+            query: Some(query.clone()),
+            response: Some(query),
             recursor,
+            state: State::Init,
         }
     }
 
-    pub fn resolve(
-        mut self,
-    ) -> Box<Future<Item = Message, Error = failure::Error> + Send + 'static> {
-        let mut query = Message::with_query(self.current_name.clone(), self.current_type);
-        let mut cache_hit = false;
+    fn lookup_in_cache(&mut self) -> failure::Result<Option<Message>> {
+        if self
+            .recursor
+            .cache
+            .lock()
+            .unwrap()
+            .gen_response(self.query.as_mut().unwrap())
         {
+            let last_answer = self.query.take().unwrap();
+            return Ok(Some(self.make_response(last_answer)));
+        }
+
+        if self.current_zone.is_none() {
             let mut cache = self.recursor.cache.lock().unwrap();
-
-            if self.current_zone.is_none() {
-                if let Some(ns) = cache.get_deepest_ns(&self.current_name) {
-                    self.current_zone = Some(ns);
-                } else {
-                    return Box::new(future::err(RecursorError::NoNameserver.into()));
-                }
-            }
-            if cache.gen_response(&mut query) {
-                cache_hit = true;
+            if let Some(ns) = cache.get_deepest_ns(&self.current_name) {
+                self.current_zone = Some(ns);
+            } else {
+                return Err(RecursorError::NoNameserver.into());
             }
         }
-
-        println!(
-            "get query {:?} and use zone {:?}",
-            self.current_name,
-            self.current_zone.as_ref().unwrap()
-        );
-
-        if cache_hit {
-            println!(
-                "---> get respon from cache {:?}",
-                query.section(SectionType::Answer)
-            );
-            return Box::new(future::ok(self.make_response(query)));
-        }
-
-        let query_name = self.current_name.clone();
-        let query_typ = self.current_type;
-        let nsas = self.recursor.nsas.clone();
-        Box::new(
-            self.recursor
-                .nsas
-                .get_nameserver(self.current_zone.as_ref().unwrap(), self.recursor.clone())
-                .and_then(move |nameserver| {
-                    Sender::new(
-                        Message::with_query(query_name, query_typ),
-                        nameserver,
-                        nsas.clone(),
-                    )
-                })
-                .and_then(move |response| self.handle_response(response)),
-        )
+        return Ok(None);
     }
 
-    pub fn handle_response(
-        mut self,
-        response: Message,
-    ) -> Box<Future<Item = Message, Error = failure::Error> + Send + 'static> {
+    pub fn handle_response(&mut self, response: Message) -> failure::Result<Option<Message>> {
         let response_type = classify_response(&self.current_name, self.current_type, &response);
-        println!(
-            "get response {:?} for query {:?} {:?}",
-            response_type, self.current_name, self.current_type
-        );
         match response_type {
             ResponseCategory::Answer
             | ResponseCategory::AnswerCName
@@ -103,8 +81,7 @@ impl RunningQuery {
                     .lock()
                     .unwrap()
                     .add_response(response_type, response.clone());
-
-                return Box::new(future::ok(self.make_response(response)));
+                return Ok(Some(self.make_response(response)));
             }
             ResponseCategory::Referral => {
                 self.recursor
@@ -113,30 +90,28 @@ impl RunningQuery {
                     .unwrap()
                     .add_response(response_type, response.clone());
                 if !self.fetch_closer_zone(response) {
-                    return Box::new(future::ok(self.make_server_failed()));
+                    return Ok(Some(self.make_server_failed()));
+                } else {
+                    return Ok(None);
                 }
-                println!(
-                    "get refer for query {:?} use new zone {:?}",
-                    self.current_name,
-                    self.current_zone.as_ref().unwrap(),
-                );
-                self.resolve()
             }
             ResponseCategory::CName(next) => {
                 println!("get cname and query {:?}", next);
                 self.merge_response(response);
-                self.current_name = next;
+                self.current_name = next.clone();
                 self.current_zone = None;
-                self.resolve()
+                self.query = Some(Message::with_query(next, self.current_type));
+                return Ok(None);
             }
             ResponseCategory::Invalid(_) | ResponseCategory::FormErr => {
-                return Box::new(future::ok(self.make_server_failed()));
+                return Ok(Some(self.make_server_failed()));
             }
         }
     }
 
-    fn make_response(mut self, mut response: Message) -> Message {
-        let mut builder = MessageBuilder::new(&mut self.response);
+    fn make_response(&mut self, mut response: Message) -> Message {
+        let mut accumulate_response = self.response.take().unwrap();
+        let mut builder = MessageBuilder::new(&mut accumulate_response);
         builder.make_response();
         builder.rcode(response.header.rcode);
         if let Some(answers) = response.take_section(SectionType::Answer) {
@@ -157,18 +132,19 @@ impl RunningQuery {
             }
         }
         builder.done();
-        self.response
+        accumulate_response
     }
 
-    fn make_server_failed(mut self) -> Message {
-        let mut builder = MessageBuilder::new(&mut self.response);
+    fn make_server_failed(&mut self) -> Message {
+        let mut accumulate_response = self.response.take().unwrap();
+        let mut builder = MessageBuilder::new(&mut accumulate_response);
         builder.rcode(Rcode::ServFail);
         builder.done();
-        self.response
+        accumulate_response
     }
 
     fn merge_response(&mut self, mut response: Message) {
-        let mut builder = MessageBuilder::new(&mut self.response);
+        let mut builder = MessageBuilder::new(self.response.as_mut().unwrap());
         if let Some(answers) = response.take_section(SectionType::Answer) {
             for answer in answers {
                 builder.add_answer(answer);
@@ -191,5 +167,94 @@ impl RunningQuery {
             return true;
         }
         return false;
+    }
+}
+
+impl Future for RunningQuery {
+    type Item = Message;
+    type Error = failure::Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        loop {
+            match mem::replace(&mut self.state, State::Poisoned) {
+                State::Init => match self.lookup_in_cache() {
+                    Err(e) => {
+                        return Err(e);
+                    }
+                    Ok(None) => {
+                        if let Some((nameserver, missing_nameservers)) = self
+                            .recursor
+                            .nsas
+                            .get_nameserver(self.current_zone.as_ref().unwrap())
+                        {
+                            if !missing_nameservers.is_empty() {
+                                spawn(
+                                    self.recursor
+                                        .nsas
+                                        .fetch_nameservers(
+                                            missing_nameservers,
+                                            self.recursor.clone(),
+                                        )
+                                        .map_err(|e| {
+                                            println!("query missing nameserver failed:{:?}", e)
+                                        }),
+                                );
+                            }
+
+                            self.state = State::QueryAuthServer(Sender::new(
+                                self.query.as_ref().unwrap().clone(),
+                                nameserver,
+                                self.recursor.nsas.clone(),
+                            ));
+                        } else {
+                            self.state = State::GetNameServer(self.recursor.nsas.fetch_zone(
+                                self.current_zone.as_ref().unwrap().clone(),
+                                self.recursor.clone(),
+                            ));
+                        }
+                    }
+                    Ok(Some(resp)) => {
+                        return Ok(Async::Ready(resp));
+                    }
+                },
+                State::GetNameServer(mut fetcher) => match fetcher.poll() {
+                    Err(e) => {
+                        return Err(e);
+                    }
+                    Ok(Async::NotReady) => {
+                        self.state = State::GetNameServer(fetcher);
+                        return Ok(Async::NotReady);
+                    }
+                    Ok(Async::Ready(nameserver)) => {
+                        self.state = State::QueryAuthServer(Sender::new(
+                            self.query.as_ref().unwrap().clone(),
+                            nameserver,
+                            self.recursor.nsas.clone(),
+                        ));
+                    }
+                },
+                State::QueryAuthServer(mut sender) => match sender.poll() {
+                    Err(e) => {
+                        return Err(e);
+                    }
+                    Ok(Async::NotReady) => {
+                        self.state = State::QueryAuthServer(sender);
+                        return Ok(Async::NotReady);
+                    }
+                    Ok(Async::Ready(resp)) => match self.handle_response(resp) {
+                        Err(e) => {
+                            return Err(e);
+                        }
+                        Ok(Some(resp)) => {
+                            return Ok(Async::Ready(resp));
+                        }
+                        Ok(None) => {
+                            self.state = State::Init;
+                        }
+                    },
+                },
+                State::Poisoned => panic!("running query state is corrupted"),
+            }
+        }
     }
 }

@@ -11,3 +11,4 @@ mod zone_fetcher;
 
 pub use crate::nsas::nameserver_entry::Nameserver;
 pub use crate::nsas::ns_address_store::NSAddressStore;
+pub use crate::nsas::zone_fetcher::ZoneFetcher;
