@@ -15,15 +15,22 @@ pub trait Resolver {
 #[derive(Clone)]
 pub struct Recursor {
     pub(crate) cache: Arc<Mutex<MessageCache>>,
-    pub(crate) nsas: Arc<NSAddressStore>,
+    pub(crate) nsas: Arc<NSAddressStore<Recursor>>,
 }
 
 impl Recursor {
     pub fn new(cache: MessageCache) -> Self {
-        Recursor {
+        let mut nsas = Arc::new(NSAddressStore::new());
+        let recursor = Recursor {
             cache: Arc::new(Mutex::new(cache)),
-            nsas: Arc::new(NSAddressStore::new()),
+            nsas: Arc::clone(&nsas),
+        };
+        unsafe {
+            let pointer = Arc::into_raw(nsas) as *mut NSAddressStore<Recursor>;
+            (*pointer).set_resolver(recursor.clone());
         }
+        assert!(recursor.nsas.resolver.is_some());
+        recursor
     }
 
     pub fn handle_query(

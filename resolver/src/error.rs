@@ -15,3 +15,13 @@ pub enum RecursorError {
     #[fail(display = "no name server is found")]
     NoNameserver,
 }
+
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_err() {
+        let err: failure::Error = RecursorError::TimerErr("good".to_string()).into();
+        assert_eq!(format!("{:?}", err), "TimerErr(\"good\")".to_string());
+    }
+}

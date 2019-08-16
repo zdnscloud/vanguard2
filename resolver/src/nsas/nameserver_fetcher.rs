@@ -21,7 +21,6 @@ pub struct NameserverFetcher<R> {
     resolver: R,
     fut: Option<Box<Future<Item = Message, Error = failure::Error> + Send>>,
     current_name: Option<Name>,
-    get_any: bool,
 }
 
 impl<R: Resolver> NameserverFetcher<R> {
@@ -32,25 +31,20 @@ impl<R: Resolver> NameserverFetcher<R> {
             resolver,
             fut: None,
             current_name: None,
-            get_any: false,
         }
     }
 }
 
 impl<R: Resolver> Future for NameserverFetcher<R> {
     type Item = ();
-    type Error = failure::Error;
+    type Error = ();
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         loop {
             if self.fut.is_none() {
                 let name = self.names.pop();
                 if name.is_none() {
-                    if self.get_any {
-                        return Ok(Async::Ready(()));
-                    } else {
-                        return Err(NSASError::NoValidNameserver.into());
-                    }
+                    return Ok(Async::Ready(()));
                 } else {
                     let name = name.unwrap();
                     self.fut = Some(
@@ -62,7 +56,13 @@ impl<R: Resolver> Future for NameserverFetcher<R> {
             }
 
             match self.fut.as_mut().unwrap().poll() {
-                Err(_) => {}
+                Err(e) => {
+                    eprintln!(
+                        "probe {:?} failed {:?}",
+                        self.current_name.as_ref().unwrap(),
+                        e
+                    );
+                }
                 Ok(Async::NotReady) => {
                     return Ok(Async::NotReady);
                 }
@@ -71,7 +71,6 @@ impl<R: Resolver> Future for NameserverFetcher<R> {
                         message_to_nameserver_entry(self.current_name.take().unwrap(), msg)
                     {
                         self.nameservers.lock().unwrap().add_nameserver(entry);
-                        self.get_any = true;
                     }
                 }
             }

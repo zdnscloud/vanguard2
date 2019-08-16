@@ -1,6 +1,7 @@
 use crate::{
-    common_error::RecursorError,
+    error::RecursorError,
     nsas::{NSAddressStore, Nameserver},
+    resolver::Recursor,
 };
 use failure;
 use futures::{prelude::*, Future};
@@ -18,7 +19,7 @@ use tokio::{
     util::FutureExt,
 };
 
-const DEFAULT_RECV_TIMEOUT: Duration = Duration::from_secs(3); //3 secs
+const DEFAULT_RECV_TIMEOUT: Duration = Duration::from_secs(1); //3 secs
 const DEFAULT_RECV_BUF_SIZE: usize = 1024;
 
 enum State {
@@ -31,12 +32,16 @@ enum State {
 pub struct Sender {
     query: Message,
     nameserver: Nameserver,
-    nsas: Arc<NSAddressStore>,
+    nsas: Arc<NSAddressStore<Recursor>>,
     state: State,
 }
 
 impl Sender {
-    pub fn new(query: Message, nameserver: Nameserver, nsas: Arc<NSAddressStore>) -> Self {
+    pub fn new(
+        query: Message,
+        nameserver: Nameserver,
+        nsas: Arc<NSAddressStore<Recursor>>,
+    ) -> Self {
         println!(
             "send query {:?} in zone {:?} to {:?} ",
             query.question, nameserver.name, nameserver.address

@@ -8,8 +8,7 @@ use crate::{
 use failure;
 use futures::{future, prelude::*, Future};
 use r53::{message::SectionType, name, Message, MessageBuilder, Name, RData, RRType, Rcode};
-use std::mem;
-use tokio::executor::spawn;
+use std::{mem, time::Duration};
 
 enum State {
     Init,
@@ -182,35 +181,22 @@ impl Future for RunningQuery {
                         return Err(e);
                     }
                     Ok(None) => {
-                        if let Some((nameserver, missing_nameservers)) = self
+                        if let Some(nameserver) = self
                             .recursor
                             .nsas
                             .get_nameserver(self.current_zone.as_ref().unwrap())
                         {
-                            if !missing_nameservers.is_empty() {
-                                spawn(
-                                    self.recursor
-                                        .nsas
-                                        .fetch_nameservers(
-                                            missing_nameservers,
-                                            self.recursor.clone(),
-                                        )
-                                        .map_err(|e| {
-                                            println!("query missing nameserver failed:{:?}", e)
-                                        }),
-                                );
-                            }
-
                             self.state = State::QueryAuthServer(Sender::new(
                                 self.query.as_ref().unwrap().clone(),
                                 nameserver,
                                 self.recursor.nsas.clone(),
                             ));
                         } else {
-                            self.state = State::GetNameServer(self.recursor.nsas.fetch_zone(
-                                self.current_zone.as_ref().unwrap().clone(),
-                                self.recursor.clone(),
-                            ));
+                            self.state = State::GetNameServer(
+                                self.recursor
+                                    .nsas
+                                    .fetch_zone(self.current_zone.as_ref().unwrap().clone()),
+                            );
                         }
                     }
                     Ok(Some(resp)) => {
@@ -235,7 +221,7 @@ impl Future for RunningQuery {
                 },
                 State::QueryAuthServer(mut sender) => match sender.poll() {
                     Err(e) => {
-                        return Err(e);
+                        return Err(RecursorError::TimerErr(format!("{:?}", e)).into());
                     }
                     Ok(Async::NotReady) => {
                         self.state = State::QueryAuthServer(sender);
