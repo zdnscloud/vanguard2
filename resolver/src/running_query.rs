@@ -1,5 +1,6 @@
 use crate::{
     error::RecursorError,
+    forwarder::Forwarder,
     message_classifier::{classify_response, ResponseCategory},
     nsas::ZoneFetcher,
     resolver::Recursor,
@@ -10,9 +11,11 @@ use futures::{future, prelude::*, Future};
 use r53::{message::SectionType, name, Message, MessageBuilder, Name, RData, RRType, Rcode};
 use std::{mem, time::Duration};
 
+const MAX_CNAME_DEPTH: usize = 12;
+
 enum State {
     Init,
-    GetNameServer(ZoneFetcher<Recursor>),
+    GetNameServer(ZoneFetcher<Forwarder>),
     QueryAuthServer(Sender),
     Poisoned,
 }
@@ -96,6 +99,10 @@ impl RunningQuery {
             }
             ResponseCategory::CName(next) => {
                 println!("get cname and query {:?}", next);
+                self.cname_depth += response.header.an_count as usize;
+                if self.cname_depth > MAX_CNAME_DEPTH {
+                    return Ok(Some(self.make_server_failed()));
+                }
                 self.merge_response(response);
                 self.current_name = next.clone();
                 self.current_zone = None;

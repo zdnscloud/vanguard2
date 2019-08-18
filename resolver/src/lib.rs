@@ -1,5 +1,6 @@
 mod cache;
 mod error;
+mod forwarder;
 mod message_classifier;
 mod nsas;
 mod resolver;

@@ -1,7 +1,7 @@
 use crate::{
     error::RecursorError,
+    forwarder::Forwarder,
     nsas::{NSAddressStore, Nameserver},
-    resolver::Recursor,
 };
 use failure;
 use futures::{prelude::*, Future};
@@ -32,7 +32,7 @@ enum State {
 pub struct Sender {
     query: Message,
     nameserver: Nameserver,
-    nsas: Arc<NSAddressStore<Recursor>>,
+    nsas: Arc<NSAddressStore<Forwarder>>,
     state: State,
 }
 
@@ -40,12 +40,8 @@ impl Sender {
     pub fn new(
         query: Message,
         nameserver: Nameserver,
-        nsas: Arc<NSAddressStore<Recursor>>,
+        nsas: Arc<NSAddressStore<Forwarder>>,
     ) -> Self {
-        println!(
-            "send query {:?} in zone {:?} to {:?} ",
-            query.question, nameserver.name, nameserver.address
-        );
         Sender {
             query,
             nameserver,

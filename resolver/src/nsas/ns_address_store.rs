@@ -63,11 +63,15 @@ impl<R: Resolver + Clone + Send + 'static> NSAddressStore<R> {
             }
         };
 
+        return nameserver;
+
         if nameserver.is_none() {
             return None;
         }
 
-        if !missing_nameserver.is_empty() {
+        if !missing_nameserver.is_empty()
+            && self.probing_name_servers.lock().unwrap().len() < MAX_PROBING_NAMESERVER_COUNT
+        {
             let missing_nameserver = {
                 let mut unprobe_nameserver = Vec::with_capacity(missing_nameserver.len());
                 let mut probing_name_servers = self.probing_name_servers.lock().unwrap();
@@ -81,11 +85,15 @@ impl<R: Resolver + Clone + Send + 'static> NSAddressStore<R> {
                     })
             };
             if !missing_nameserver.is_empty() {
-                println!("start to probe {:?}", missing_nameserver);
+                println!(
+                    "start to probe {:?}, waiting queue len is {}",
+                    missing_nameserver,
+                    self.probing_name_servers.lock().unwrap().len()
+                );
                 let probing_name_servers = self.probing_name_servers.clone();
                 let done_nameserver = missing_nameserver.clone();
                 let resolver = self.resolver.as_ref().unwrap().clone();
-                spawn(
+                spawn(Box::new(
                     NameserverFetcher::new(missing_nameserver, self.nameservers.clone(), resolver)
                         .map(move |_| {
                             let mut probing_name_servers = probing_name_servers.lock().unwrap();
@@ -93,7 +101,7 @@ impl<R: Resolver + Clone + Send + 'static> NSAddressStore<R> {
                                 probing_name_servers.remove(&n);
                             });
                         }),
-                );
+                ));
             }
         }
         Some(nameserver.unwrap())
