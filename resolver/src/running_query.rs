@@ -51,25 +51,34 @@ impl RunningQuery {
         }
     }
 
-    fn lookup_in_cache(&mut self) -> failure::Result<Option<Message>> {
-        if self
+    fn lookup_in_cache(&mut self) -> Option<Message> {
+        let found_in_cache = self
             .recursor
             .cache
             .lock()
             .unwrap()
-            .gen_response(self.query.as_mut().unwrap())
-        {
+            .gen_response(self.query.as_mut().unwrap());
+        if found_in_cache {
             let last_answer = self.query.take().unwrap();
-            return Ok(Some(self.make_response(last_answer)));
+            return Some(self.make_response(last_answer));
         }
 
-        let mut cache = self.recursor.cache.lock().unwrap();
-        if let Some(ns) = cache.get_deepest_ns(&self.current_name) {
+        if let Some(ns) = self
+            .recursor
+            .cache
+            .lock()
+            .unwrap()
+            .get_deepest_ns(&self.current_name)
+        {
             self.current_zone = Some(ns);
-        } else {
-            return Err(RecursorError::NoNameserver.into());
+            return None;
         }
-        return Ok(None);
+
+        self.recursor
+            .roothint
+            .fill_cache(&mut self.recursor.cache.lock().unwrap());
+        self.current_zone = Some(name::root());
+        return None;
     }
 
     pub fn handle_response(&mut self, response: Message) -> failure::Result<Option<Message>> {
@@ -186,10 +195,7 @@ impl Future for RunningQuery {
         loop {
             match mem::replace(&mut self.state, State::Poisoned) {
                 State::Init => match self.lookup_in_cache() {
-                    Err(e) => {
-                        return Err(e);
-                    }
-                    Ok(None) => {
+                    None => {
                         if let Some(nameserver) = self
                             .recursor
                             .nsas
@@ -217,7 +223,7 @@ impl Future for RunningQuery {
                             ));
                         }
                     }
-                    Ok(Some(resp)) => {
+                    Some(resp) => {
                         return Ok(Async::Ready(resp));
                     }
                 },

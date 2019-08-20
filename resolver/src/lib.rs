@@ -4,6 +4,7 @@ mod forwarder;
 mod message_classifier;
 mod nsas;
 mod resolver;
+mod roothint;
 mod running_query;
 mod sender;
 
