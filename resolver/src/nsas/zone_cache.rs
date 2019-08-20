@@ -33,12 +33,31 @@ pub struct ZoneCache(pub LruCache<EntryKey, ZoneEntry>);
 impl ZoneCache {
     pub fn add_zone(&mut self, entry: ZoneEntry) {
         let key = entry.get_key();
-        self.0.pop(&key);
+        if let Some(old) = self.0.get(&key) {
+            if old.is_expired() {
+                self.0.pop(&key);
+            } else {
+                return;
+            }
+        }
         self.0.put(key, entry);
     }
 
-    pub fn get_zone(&mut self, key: &EntryKey) -> Option<&ZoneEntry> {
-        self.0.get(key)
+    pub fn get_nameserver(
+        &mut self,
+        key: &EntryKey,
+        nameservers: &mut NameserverCache,
+    ) -> (Option<Nameserver>, Vec<Name>) {
+        if let Some(entry) = self.0.get(key) {
+            if entry.is_expired() {
+                self.0.pop(key);
+                return (None, Vec::new());
+            } else {
+                return entry.select_nameserver(nameservers);
+            }
+        } else {
+            return (None, Vec::new());
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -75,8 +94,8 @@ impl ZoneEntry {
             let name = missing_names.swap_remove(i);
             let key = &EntryKey::from_name(&name);
             let mut nameserver_is_healthy = false;
-            if let Some(entry) = nameservers.get_nameserver(key) {
-                servers.push(entry.select_nameserver());
+            if let Some(nameserver) = nameservers.get_nameserver(key) {
+                servers.push(nameserver);
                 nameserver_is_healthy = true;
             }
             if !nameserver_is_healthy {
@@ -93,8 +112,14 @@ impl ZoneEntry {
         }
     }
 
+    #[inline]
     pub fn get_server_names(&self) -> &Vec<Name> {
         &self.nameservers
+    }
+
+    #[inline]
+    pub fn is_expired(&self) -> bool {
+        self.expire_time <= Instant::now()
     }
 }
 

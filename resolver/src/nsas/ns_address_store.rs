@@ -53,57 +53,15 @@ impl<R: Resolver> NSAddressStore<R> {
     }
 
     //this must be invoked in a future
-    pub fn get_nameserver(&self, zone: &Name) -> Option<(Nameserver)> {
-        let (nameserver, missing_nameserver) = {
-            let key = &EntryKey::from_name(zone);
-            let mut zones = self.zones.lock().unwrap();
-            if let Some(entry) = zones.get_zone(key) {
-                entry.select_nameserver(&mut self.nameservers.lock().unwrap())
-            } else {
-                (None, Vec::new())
-            }
-        };
-
-        if nameserver.is_none() {
-            return None;
-        }
-
-        if !missing_nameserver.is_empty()
-            && self.probing_name_servers.lock().unwrap().len() < MAX_PROBING_NAMESERVER_COUNT
-        {
-            let missing_nameserver = {
-                let mut unprobe_nameserver = Vec::with_capacity(missing_nameserver.len());
-                let mut probing_name_servers = self.probing_name_servers.lock().unwrap();
-                missing_nameserver
-                    .into_iter()
-                    .fold(unprobe_nameserver, |mut servers, n| {
-                        if probing_name_servers.insert(n.clone()) {
-                            servers.push(n);
-                        }
-                        servers
-                    })
-            };
-            if !missing_nameserver.is_empty() {
-                println!(
-                    "start to probe {:?}, waiting queue len is {}",
-                    missing_nameserver,
-                    self.probing_name_servers.lock().unwrap().len()
-                );
-                let probing_name_servers = self.probing_name_servers.clone();
-                let done_nameserver = missing_nameserver.clone();
-                let resolver = self.resolver.as_ref().unwrap().clone();
-                spawn(Box::new(
-                    NameserverFetcher::new(missing_nameserver, self.nameservers.clone(), resolver)
-                        .map(move |_| {
-                            let mut probing_name_servers = probing_name_servers.lock().unwrap();
-                            done_nameserver.into_iter().for_each(|n| {
-                                probing_name_servers.remove(&n);
-                            });
-                        }),
-                ));
-            }
-        }
-        Some(nameserver.unwrap())
+    pub fn get_nameserver(&self, zone: &Name) -> Option<Nameserver> {
+        let key = &EntryKey::from_name(zone);
+        let (nameserver, missing_nameserver) = self
+            .zones
+            .lock()
+            .unwrap()
+            .get_nameserver(key, &mut self.nameservers.lock().unwrap());
+        self.probe_nameservers(missing_nameserver);
+        nameserver
     }
 
     pub fn fetch_zone(&self, zone: Name, depth: usize) -> ZoneFetcher<R> {
@@ -121,6 +79,47 @@ impl<R: Resolver> NSAddressStore<R> {
         let key = &EntryKey::from_name(&nameserver.name);
         if let Some(entry) = nameservers.get_nameserver_mut(key) {
             entry.update_nameserver(nameserver);
+        }
+    }
+
+    fn probe_nameservers(&self, missing_nameserver: Vec<Name>) {
+        if missing_nameserver.is_empty()
+            || self.probing_name_servers.lock().unwrap().len() >= MAX_PROBING_NAMESERVER_COUNT
+        {
+            return;
+        }
+
+        let missing_nameserver = {
+            let mut unprobe_nameserver = Vec::with_capacity(missing_nameserver.len());
+            let mut probing_name_servers = self.probing_name_servers.lock().unwrap();
+            missing_nameserver
+                .into_iter()
+                .fold(unprobe_nameserver, |mut servers, n| {
+                    if probing_name_servers.insert(n.clone()) {
+                        servers.push(n);
+                    }
+                    servers
+                })
+        };
+        if !missing_nameserver.is_empty() {
+            println!(
+                "start to probe {:?}, waiting queue len is {}",
+                missing_nameserver,
+                self.probing_name_servers.lock().unwrap().len()
+            );
+            let probing_name_servers = self.probing_name_servers.clone();
+            let done_nameserver = missing_nameserver.clone();
+            let resolver = self.resolver.as_ref().unwrap().clone();
+            spawn(Box::new(
+                NameserverFetcher::new(missing_nameserver, self.nameservers.clone(), resolver).map(
+                    move |_| {
+                        let mut probing_name_servers = probing_name_servers.lock().unwrap();
+                        done_nameserver.into_iter().for_each(|n| {
+                            probing_name_servers.remove(&n);
+                        });
+                    },
+                ),
+            ));
         }
     }
 }

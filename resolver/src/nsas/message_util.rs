@@ -56,6 +56,7 @@ pub fn message_to_zone_entry(
                         nameservers.push(NameserverEntry::new(
                             name.clone(),
                             rrset_to_address_entry(rrset),
+                            Duration::new(rrset.ttl.0 as u64, 0),
                         ));
                         rrset_index = i;
                         break;
@@ -97,6 +98,7 @@ pub fn message_to_nameserver_entry(nameserver: Name, msg: Message) -> Result<Nam
     Ok(NameserverEntry::new(
         nameserver,
         rrset_to_address_entry(&answer[0]),
+        Duration::new(answer[0].ttl.0 as u64, 0),
     ))
 }
 

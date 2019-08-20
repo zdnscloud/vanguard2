@@ -71,8 +71,15 @@ impl NameserverCache {
         self.0.put(key, entry);
     }
 
-    pub fn get_nameserver(&mut self, key: &EntryKey) -> Option<&NameserverEntry> {
-        self.0.get(key)
+    pub fn get_nameserver(&mut self, key: &EntryKey) -> Option<Nameserver> {
+        if let Some(entry) = self.0.get(key) {
+            if !entry.is_expired() {
+                return Some(entry.select_nameserver());
+            } else {
+                self.0.pop(key);
+            }
+        }
+        None
     }
 
     pub fn get_nameserver_mut(&mut self, key: &EntryKey) -> Option<&mut NameserverEntry> {
@@ -85,14 +92,16 @@ impl NameserverCache {
 }
 
 impl NameserverEntry {
-    pub fn new(name: Name, addresses: Vec<AddressEntry>) -> Self {
+    pub fn new(name: Name, addresses: Vec<AddressEntry>, ttl: Duration) -> Self {
         debug_assert!(!addresses.is_empty());
 
         let name = Box::into_raw(Box::new(name));
         NameserverEntry {
             name,
             addresses,
-            expire_time: Instant::now(),
+            expire_time: Instant::now()
+                .checked_add(ttl)
+                .expect("nameserver ttl out of range"),
         }
     }
 
@@ -109,6 +118,11 @@ impl NameserverEntry {
     #[inline]
     pub fn get_addresses(&self) -> &Vec<AddressEntry> {
         &self.addresses
+    }
+
+    #[inline]
+    pub fn is_expired(&self) -> bool {
+        self.expire_time <= Instant::now()
     }
 
     #[inline]
@@ -158,6 +172,7 @@ mod test {
         let entry = NameserverEntry::new(
             Name::new("n1").unwrap(),
             vec![AddressEntry::new(IpAddr::V4(Ipv4Addr::new(1, 1, 1, 1)), 0)],
+            Duration::new(10000, 0),
         );
         cache.add_nameserver(entry);
 
