@@ -39,10 +39,8 @@ impl MessageLruCache {
     }
 
     pub fn gen_response(&mut self, query: &mut Message) -> bool {
-        let key = &EntryKey(
-            &query.question.as_ref().unwrap().name as *const Name,
-            query.question.as_ref().unwrap().typ,
-        );
+        let question = &query.question.as_ref().unwrap();
+        let key = &EntryKey(&question.name as *const Name, question.typ);
         if let Some(entry) = self.messages.get(key) {
             let succeed = entry.fill_message(query, &mut self.rrset_cache);
             if !succeed {
@@ -55,8 +53,15 @@ impl MessageLruCache {
     }
 
     pub fn add_response(&mut self, message: Message) {
+        let question = &message.question.as_ref().unwrap();
+        let key = &EntryKey(&question.name as *const Name, question.typ);
+        if let Some(entry) = self.messages.get(key) {
+            if !entry.is_expired() {
+                return;
+            }
+        }
         let entry = MessageEntry::new(message, &mut self.rrset_cache);
-        //keep k,v in pair, couldn't old key, since name in old key point to old value
+        //keep k,v in pair, couldn't use old key, since name in old key point to old value
         //which will be cleaned after the update
         self.messages.pop(&entry.key());
         self.messages.put(entry.key(), entry);

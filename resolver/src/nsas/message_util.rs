@@ -9,18 +9,23 @@ use failure::Result;
 use r53::{message::SectionType, Message, Name, RData, RRType, RRset};
 use std::{net::IpAddr, time::Duration};
 
+//the message could be an answer to the right zone
+//or the refer which the zone doens't exists, but a parent zone exists
 pub fn message_to_zone_entry(
     zone: &Name,
     mut msg: Message,
 ) -> Result<(ZoneEntry, Option<Vec<NameserverEntry>>)> {
     let category = classify_response(zone, RRType::NS, &msg);
-    if category != ResponseCategory::Answer {
+    let answer = if category == ResponseCategory::Answer {
+        msg.take_section(SectionType::Answer).unwrap()
+    } else if category == ResponseCategory::Referral {
+        msg.take_section(SectionType::Authority).unwrap()
+    } else {
         return Err(
             NSASError::InvalidNSResponse("ns query doesn't return answer".to_string()).into(),
         );
-    }
+    };
 
-    let answer = msg.take_section(SectionType::Answer).unwrap();
     let glue = msg.take_section(SectionType::Additional);
     let ns_count = answer[0].rdatas.len();
     let names = answer[0]
@@ -33,47 +38,51 @@ pub fn message_to_zone_entry(
             names
         });
 
-    if glue.is_none() {
-        let zone_entry = ZoneEntry::new(
-            zone.clone(),
-            names,
-            Duration::new(answer[0].ttl.0 as u64, 0),
-        );
-        return Ok((zone_entry, None));
+    let zone = if category == ResponseCategory::Answer {
+        zone.clone()
     } else {
-        let mut glue = glue.unwrap();
-        let mut nameservers = Vec::with_capacity(names.len());
-        for name in &names {
-            let mut rrset_index = glue.len();
-            for (i, rrset) in glue.iter().enumerate() {
-                if rrset.name.eq(name) && (rrset.typ == RRType::A || rrset.typ == RRType::AAAA) {
-                    nameservers.push(NameserverEntry::new(
-                        name.clone(),
-                        rrset_to_address_entry(rrset),
-                    ));
-                    rrset_index = i;
-                    break;
+        answer[0].name.clone()
+    };
+
+    let nameservers = match glue {
+        None => None,
+        Some(mut glue) => {
+            let mut nameservers = Vec::with_capacity(names.len());
+            for name in &names {
+                let mut rrset_index = glue.len();
+                for (i, rrset) in glue.iter().enumerate() {
+                    //if rrset.name.eq(name) && (rrset.typ == RRType::A || rrset.typ == RRType::AAAA) {
+                    if rrset.name.eq(name) && (rrset.typ == RRType::A) {
+                        nameservers.push(NameserverEntry::new(
+                            name.clone(),
+                            rrset_to_address_entry(rrset),
+                        ));
+                        rrset_index = i;
+                        break;
+                    }
+                }
+                if rrset_index != glue.len() {
+                    glue.remove(rrset_index);
                 }
             }
-
-            if rrset_index != glue.len() {
-                glue.remove(rrset_index);
-            }
-        }
-        let zone_entry = ZoneEntry::new(
-            zone.clone(),
-            names,
-            Duration::new(answer[0].ttl.0 as u64, 0),
-        );
-        return Ok((
-            zone_entry,
-            if nameservers.len() == 0 {
+            if nameservers.is_empty() {
                 None
             } else {
                 Some(nameservers)
-            },
-        ));
+            }
+        }
+    };
+
+    if nameservers.is_none() && names.iter().all(|n| n.is_subdomain(&zone)) {
+        return Err(NSASError::InvalidNSResponse(
+            "subdomain ns has no related v4 glue".to_string(),
+        )
+        .into());
     }
+    Ok((
+        ZoneEntry::new(zone, names, Duration::new(answer[0].ttl.0 as u64, 0)),
+        nameservers,
+    ))
 }
 
 pub fn message_to_nameserver_entry(nameserver: Name, msg: Message) -> Result<NameserverEntry> {

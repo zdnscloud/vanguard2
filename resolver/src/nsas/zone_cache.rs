@@ -4,12 +4,28 @@ use crate::nsas::{
 };
 use lru::LruCache;
 use r53::Name;
-use std::time::{Duration, Instant};
+use std::{
+    fmt,
+    time::{Duration, Instant},
+};
 
 pub struct ZoneEntry {
     name: *mut Name,
     nameservers: Vec<Name>,
     expire_time: Instant,
+}
+
+impl fmt::Debug for ZoneEntry {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        unsafe {
+            write!(
+                f,
+                "name:{:?} nameservers:{:?}",
+                (*self.name),
+                self.nameservers
+            )
+        }
+    }
 }
 
 pub struct ZoneCache(pub LruCache<EntryKey, ZoneEntry>);
@@ -77,8 +93,8 @@ impl ZoneEntry {
         }
     }
 
-    pub fn get_server_names(&self) -> Vec<Name> {
-        self.nameservers.clone()
+    pub fn get_server_names(&self) -> &Vec<Name> {
+        &self.nameservers
     }
 }
 

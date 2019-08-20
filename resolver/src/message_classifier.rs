@@ -50,16 +50,14 @@ pub fn classify_response(name: &Name, typ: RRType, msg: &Message) -> ResponseCat
     let answer = msg.section(SectionType::Answer);
     let authority = msg.section(SectionType::Authority);
     if answer.is_none() {
-        if authority.is_none() {
-            return ResponseCategory::Invalid("empty response".to_string());
-        } else {
+        if !authority.is_none() {
             for rrset in authority.unwrap() {
                 if rrset.typ == RRType::NS {
                     return ResponseCategory::Referral;
                 }
             }
-            return ResponseCategory::NXRRset;
         }
+        return ResponseCategory::NXRRset;
     }
 
     let answer = answer.unwrap();

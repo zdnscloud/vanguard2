@@ -1,6 +1,5 @@
 use crate::{
     error::RecursorError,
-    forwarder::Forwarder,
     message_classifier::{classify_response, ResponseCategory},
     nsas::ZoneFetcher,
     resolver::Recursor,
@@ -12,10 +11,11 @@ use r53::{message::SectionType, name, Message, MessageBuilder, Name, RData, RRTy
 use std::{mem, time::Duration};
 
 const MAX_CNAME_DEPTH: usize = 12;
+const MAX_QUERY_DEPTH: usize = 10;
 
 enum State {
     Init,
-    GetNameServer(ZoneFetcher<Forwarder>),
+    GetNameServer(ZoneFetcher),
     QueryAuthServer(Sender),
     Poisoned,
 }
@@ -29,13 +29,15 @@ pub struct RunningQuery {
     response: Option<Message>,
     recursor: Recursor,
     state: State,
+    depth: usize,
 }
 
 impl RunningQuery {
-    pub fn new(query: Message, recursor: Recursor) -> Self {
+    pub fn new(query: Message, recursor: Recursor, depth: usize) -> Self {
         let question = query.question.as_ref().unwrap();
         let current_name = question.name.clone();
         let current_type = question.typ;
+
         RunningQuery {
             current_name,
             current_type,
@@ -45,6 +47,7 @@ impl RunningQuery {
             response: Some(query),
             recursor,
             state: State::Init,
+            depth,
         }
     }
 
@@ -60,13 +63,11 @@ impl RunningQuery {
             return Ok(Some(self.make_response(last_answer)));
         }
 
-        if self.current_zone.is_none() {
-            let mut cache = self.recursor.cache.lock().unwrap();
-            if let Some(ns) = cache.get_deepest_ns(&self.current_name) {
-                self.current_zone = Some(ns);
-            } else {
-                return Err(RecursorError::NoNameserver.into());
-            }
+        let mut cache = self.recursor.cache.lock().unwrap();
+        if let Some(ns) = cache.get_deepest_ns(&self.current_name) {
+            self.current_zone = Some(ns);
+        } else {
+            return Err(RecursorError::NoNameserver.into());
         }
         return Ok(None);
     }
@@ -78,12 +79,13 @@ impl RunningQuery {
             | ResponseCategory::AnswerCName
             | ResponseCategory::NXDomain
             | ResponseCategory::NXRRset => {
+                let response = self.make_response(response);
                 self.recursor
                     .cache
                     .lock()
                     .unwrap()
                     .add_response(response_type, response.clone());
-                return Ok(Some(self.make_response(response)));
+                return Ok(Some(response));
             }
             ResponseCategory::Referral => {
                 self.recursor
@@ -199,11 +201,20 @@ impl Future for RunningQuery {
                                 self.recursor.nsas.clone(),
                             ));
                         } else {
-                            self.state = State::GetNameServer(
-                                self.recursor
-                                    .nsas
-                                    .fetch_zone(self.current_zone.as_ref().unwrap().clone()),
-                            );
+                            if self.depth > MAX_QUERY_DEPTH {
+                                println!(
+                                    "----> query {:?}, {:?} {} , failed loop query",
+                                    self.current_name,
+                                    self.current_type.to_string(),
+                                    self.depth,
+                                );
+                                return Err(RecursorError::LoopedQuery.into());
+                            }
+
+                            self.state = State::GetNameServer(self.recursor.nsas.fetch_zone(
+                                self.current_zone.as_ref().unwrap().clone(),
+                                self.depth,
+                            ));
                         }
                     }
                     Ok(Some(resp)) => {

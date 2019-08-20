@@ -6,6 +6,7 @@ use lru::LruCache;
 use r53::Name;
 use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
+    fmt,
     net::IpAddr,
     time::{Duration, Instant},
 };
@@ -51,6 +52,12 @@ pub struct NameserverEntry {
     name: *mut Name,
     addresses: Vec<AddressEntry>,
     expire_time: Instant,
+}
+
+impl fmt::Debug for NameserverEntry {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        unsafe { write!(f, "name:{:?} addresses:{:?}", (*self.name), self.addresses) }
+    }
 }
 
 pub struct NameserverCache(pub LruCache<EntryKey, NameserverEntry>);

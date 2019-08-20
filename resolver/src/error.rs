@@ -14,6 +14,9 @@ pub enum RecursorError {
 
     #[fail(display = "no name server is found")]
     NoNameserver,
+
+    #[fail(display = "query get loop")]
+    LoopedQuery,
 }
 
 mod test {

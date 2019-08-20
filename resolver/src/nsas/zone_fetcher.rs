@@ -5,7 +5,8 @@ use crate::{
         nameserver_cache::{self, Nameserver, NameserverCache},
         zone_cache::ZoneCache,
     },
-    Resolver,
+    running_query::RunningQuery,
+    Recursor,
 };
 use failure::{self, Result};
 use futures::{future, prelude::*, Future};
@@ -17,46 +18,42 @@ use std::{
 };
 
 enum FetcherState {
-    FetchNS(
-        Name,
-        Box<Future<Item = Message, Error = failure::Error> + Send>,
-    ),
-    FetchAddress(
-        Name,
-        Box<Future<Item = Message, Error = failure::Error> + Send>,
-        Vec<Name>,
-    ),
+    FetchNS(Name, Box<RunningQuery>),
+    FetchAddress(Name, Box<RunningQuery>, Vec<Name>),
     Poisoned,
 }
 
-pub struct ZoneFetcher<R> {
+pub struct ZoneFetcher {
     state: FetcherState,
-    resolver: R,
+    resolver: Recursor,
     nameservers: Arc<Mutex<NameserverCache>>,
     zones: Arc<Mutex<ZoneCache>>,
+    depth: usize,
 }
 
-impl<R: Resolver> ZoneFetcher<R> {
+impl ZoneFetcher {
     pub fn new(
         zone: Name,
-        resolver: R,
+        resolver: Recursor,
         nameservers: Arc<Mutex<NameserverCache>>,
         zones: Arc<Mutex<ZoneCache>>,
+        depth: usize,
     ) -> Self {
         let zone_copy = zone.clone();
         ZoneFetcher {
             state: FetcherState::FetchNS(
                 zone,
-                resolver.resolve(Message::with_query(zone_copy, RRType::NS)),
+                Box::new(resolver.new_query(Message::with_query(zone_copy, RRType::NS), depth + 1)),
             ),
             resolver,
             nameservers,
             zones,
+            depth,
         }
     }
 }
 
-impl<R: Resolver> Future for ZoneFetcher<R> {
+impl Future for ZoneFetcher {
     type Item = Nameserver;
     type Error = failure::Error;
 
@@ -102,9 +99,10 @@ impl<R: Resolver> Future for ZoneFetcher<R> {
 
                                 debug_assert!(!missing_names.is_empty());
                                 let name = missing_names.pop().unwrap();
-                                let fut = self
-                                    .resolver
-                                    .resolve(Message::with_query(name.clone(), RRType::A));
+                                let fut = Box::new(self.resolver.new_query(
+                                    Message::with_query(name.clone(), RRType::A),
+                                    self.depth + 1,
+                                ));
                                 self.state = FetcherState::FetchAddress(name, fut, missing_names);
                             }
                         } else {
@@ -140,9 +138,10 @@ impl<R: Resolver> Future for ZoneFetcher<R> {
                     }
 
                     let current_name = names.pop().unwrap();
-                    let fut = self
-                        .resolver
-                        .resolve(Message::with_query(current_name.clone(), RRType::A));
+                    let fut = Box::new(self.resolver.new_query(
+                        Message::with_query(current_name.clone(), RRType::A),
+                        self.depth + 1,
+                    ));
                     self.state = FetcherState::FetchAddress(current_name, fut, names);
                 }
                 FetcherState::Poisoned => panic!("zone fetcher state panic inside pool"),
@@ -151,6 +150,7 @@ impl<R: Resolver> Future for ZoneFetcher<R> {
     }
 }
 
+/*
 mod test {
     use super::*;
     use crate::nsas::test_helper::DumbResolver;
@@ -241,3 +241,4 @@ mod test {
         assert_eq!(zones.lock().unwrap().len(), 1);
     }
 }
+*/

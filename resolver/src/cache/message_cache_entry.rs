@@ -97,12 +97,18 @@ impl MessageEntry {
         }
     }
 
+    #[inline]
     pub fn key(&self) -> EntryKey {
         EntryKey(self.name, self.typ)
     }
 
+    #[inline]
+    pub fn is_expired(&self) -> bool {
+        self.expire_time <= Instant::now()
+    }
+
     pub fn fill_message(&self, query: &mut Message, rrset_cache: &mut RRsetLruCache) -> bool {
-        if self.expire_time <= Instant::now() {
+        if self.is_expired() {
             return false;
         }
 

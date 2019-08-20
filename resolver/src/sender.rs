@@ -1,6 +1,5 @@
 use crate::{
     error::RecursorError,
-    forwarder::Forwarder,
     nsas::{NSAddressStore, Nameserver},
 };
 use failure;
@@ -32,16 +31,12 @@ enum State {
 pub struct Sender {
     query: Message,
     nameserver: Nameserver,
-    nsas: Arc<NSAddressStore<Forwarder>>,
+    nsas: Arc<NSAddressStore>,
     state: State,
 }
 
 impl Sender {
-    pub fn new(
-        query: Message,
-        nameserver: Nameserver,
-        nsas: Arc<NSAddressStore<Forwarder>>,
-    ) -> Self {
+    pub fn new(query: Message, nameserver: Nameserver, nsas: Arc<NSAddressStore>) -> Self {
         Sender {
             query,
             nameserver,

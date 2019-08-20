@@ -5,7 +5,8 @@ use crate::{
         message_util::{message_to_nameserver_entry, message_to_zone_entry},
         nameserver_cache::{Nameserver, NameserverCache, NameserverEntry},
     },
-    Resolver,
+    running_query::RunningQuery,
+    Recursor,
 };
 use failure;
 use futures::{future, prelude::*, Future};
@@ -15,16 +16,20 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub struct NameserverFetcher<R> {
+pub struct NameserverFetcher {
     names: Vec<Name>,
     nameservers: Arc<Mutex<NameserverCache>>,
-    resolver: R,
-    fut: Option<Box<Future<Item = Message, Error = failure::Error> + Send>>,
+    resolver: Recursor,
+    fut: Option<RunningQuery>,
     current_name: Option<Name>,
 }
 
-impl<R: Resolver> NameserverFetcher<R> {
-    pub fn new(names: Vec<Name>, nameservers: Arc<Mutex<NameserverCache>>, resolver: R) -> Self {
+impl NameserverFetcher {
+    pub fn new(
+        names: Vec<Name>,
+        nameservers: Arc<Mutex<NameserverCache>>,
+        resolver: Recursor,
+    ) -> Self {
         NameserverFetcher {
             names,
             nameservers,
@@ -35,7 +40,7 @@ impl<R: Resolver> NameserverFetcher<R> {
     }
 }
 
-impl<R: Resolver> Future for NameserverFetcher<R> {
+impl Future for NameserverFetcher {
     type Item = ();
     type Error = ();
 
@@ -49,7 +54,7 @@ impl<R: Resolver> Future for NameserverFetcher<R> {
                     let name = name.unwrap();
                     self.fut = Some(
                         self.resolver
-                            .resolve(Message::with_query(name.clone(), RRType::A)),
+                            .new_query(Message::with_query(name.clone(), RRType::A), 1),
                     );
                     self.current_name = Some(name);
                 }
@@ -79,6 +84,7 @@ impl<R: Resolver> Future for NameserverFetcher<R> {
     }
 }
 
+/*
 mod test {
     use super::*;
     use crate::nsas::test_helper::DumbResolver;
@@ -116,3 +122,4 @@ mod test {
         assert_eq!(nameservers.lock().unwrap().len(), 3);
     }
 }
+*/

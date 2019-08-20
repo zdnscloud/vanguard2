@@ -1,6 +1,5 @@
 use crate::{
-    cache::MessageCache, error::RecursorError, forwarder::Forwarder, nsas::NSAddressStore,
-    running_query::RunningQuery,
+    cache::MessageCache, error::RecursorError, nsas::NSAddressStore, running_query::RunningQuery,
 };
 use failure;
 use futures::{future, Future};
@@ -11,15 +10,10 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::prelude::*;
 
-pub trait Resolver {
-    fn resolve(&self, query: Message)
-        -> Box<Future<Item = Message, Error = failure::Error> + Send>;
-}
-
 #[derive(Clone)]
 pub struct Recursor {
     pub(crate) cache: Arc<Mutex<MessageCache>>,
-    pub(crate) nsas: Arc<NSAddressStore<Forwarder>>,
+    pub(crate) nsas: Arc<NSAddressStore>,
 }
 
 impl Recursor {
@@ -30,13 +24,10 @@ impl Recursor {
             nsas: Arc::clone(&nsas),
         };
         unsafe {
-            let pointer = Arc::into_raw(nsas) as *mut NSAddressStore<Forwarder>;
-            (*pointer).set_resolver(Forwarder::new(SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::new(114, 114, 114, 114)),
-                53,
-            )));
+            let pointer = Arc::into_raw(nsas) as *mut NSAddressStore;
+            (*pointer).set_resolver(recursor.clone());
         }
-        assert!(recursor.nsas.resolver.is_some());
+        assert!(recursor.nsas.recursor.is_some());
         recursor
     }
 
@@ -46,21 +37,12 @@ impl Recursor {
     ) -> Box<Future<Item = Done, Error = failure::Error> + Send + 'static> {
         let client = query.client;
         Box::new(
-            RunningQuery::new(query.message, self.clone())
+            RunningQuery::new(query.message, self.clone(), 1)
                 .map(move |message| Done(Query { client, message })),
         )
     }
-}
 
-impl Resolver for Recursor {
-    fn resolve(
-        &self,
-        query: Message,
-    ) -> Box<Future<Item = Message, Error = failure::Error> + Send + 'static> {
-        Box::new(
-            RunningQuery::new(query, self.clone())
-                .timeout(Duration::from_secs(3))
-                .map_err(|e| RecursorError::TimerErr(format!("{:?}", e)).into()),
-        )
+    pub fn new_query(&self, query: Message, depth: usize) -> RunningQuery {
+        RunningQuery::new(query, self.clone(), depth)
     }
 }
