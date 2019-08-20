@@ -1,6 +1,7 @@
 use crate::zones::AuthZone;
+use failure;
 use futures::{future, Future};
-use server::{Done, Failed, Query};
+use server::Query;
 use std::sync::{Arc, RwLock};
 
 pub struct AuthServer {
@@ -21,14 +22,16 @@ impl AuthServer {
     pub fn handle_query(
         &self,
         mut query: Query,
-    ) -> impl Future<Item = Done, Error = Failed> + Send + 'static {
+    ) -> impl Future<Item = Query, Error = failure::Error> + Send + 'static {
         let zones = self.zones.clone();
         future::lazy(move || {
             let zones = zones.read().unwrap();
             if zones.handle_query(&mut query.message) {
-                future::ok(Done(query))
+                query.done = true;
+                future::ok(query)
             } else {
-                future::err(Failed(query))
+                query.done = false;
+                future::ok(query)
             }
         })
     }

@@ -5,6 +5,7 @@ use crate::{
         message_util::{message_to_nameserver_entry, message_to_zone_entry},
         nameserver_cache::{Nameserver, NameserverCache, NameserverEntry},
     },
+    resolver::Resolver,
     running_query::RunningQuery,
     Recursor,
 };
@@ -16,20 +17,16 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub struct NameserverFetcher {
+pub struct NameserverFetcher<R: Resolver> {
     names: Vec<Name>,
     nameservers: Arc<Mutex<NameserverCache>>,
-    resolver: Recursor,
-    fut: Option<RunningQuery>,
+    resolver: R,
+    fut: Option<R::Query>,
     current_name: Option<Name>,
 }
 
-impl NameserverFetcher {
-    pub fn new(
-        names: Vec<Name>,
-        nameservers: Arc<Mutex<NameserverCache>>,
-        resolver: Recursor,
-    ) -> Self {
+impl<R: Resolver> NameserverFetcher<R> {
+    pub fn new(names: Vec<Name>, nameservers: Arc<Mutex<NameserverCache>>, resolver: R) -> Self {
         NameserverFetcher {
             names,
             nameservers,
@@ -40,7 +37,7 @@ impl NameserverFetcher {
     }
 }
 
-impl Future for NameserverFetcher {
+impl<R: Resolver> Future for NameserverFetcher<R> {
     type Item = ();
     type Error = ();
 
@@ -84,7 +81,6 @@ impl Future for NameserverFetcher {
     }
 }
 
-/*
 mod test {
     use super::*;
     use crate::nsas::test_helper::DumbResolver;
@@ -122,4 +118,3 @@ mod test {
         assert_eq!(nameservers.lock().unwrap().len(), 3);
     }
 }
-*/

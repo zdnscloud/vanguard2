@@ -10,6 +10,6 @@ mod server;
 mod tcp_server;
 mod udp_server;
 
-pub use crate::handler::{Done, Failed, Query, QueryHandler};
+pub use crate::handler::{Query, QueryHandler};
 pub use crate::server::Server;
 pub use crate::udp_server::start_qps_calculate;

@@ -2,7 +2,7 @@ use crate::{
     error::RecursorError,
     message_classifier::{classify_response, ResponseCategory},
     nsas::ZoneFetcher,
-    resolver::Recursor,
+    resolver::{Recursor, Resolver},
     sender::Sender,
 };
 use failure;
@@ -15,7 +15,7 @@ const MAX_QUERY_DEPTH: usize = 10;
 
 enum State {
     Init,
-    GetNameServer(ZoneFetcher),
+    GetNameServer(ZoneFetcher<Recursor>),
     QueryAuthServer(Sender),
     Poisoned,
 }

@@ -1,6 +1,7 @@
 use crate::{
     error::RecursorError,
     nsas::{NSAddressStore, Nameserver},
+    Recursor,
 };
 use failure;
 use futures::{prelude::*, Future};
@@ -31,12 +32,16 @@ enum State {
 pub struct Sender {
     query: Message,
     nameserver: Nameserver,
-    nsas: Arc<NSAddressStore>,
+    nsas: Arc<NSAddressStore<Recursor>>,
     state: State,
 }
 
 impl Sender {
-    pub fn new(query: Message, nameserver: Nameserver, nsas: Arc<NSAddressStore>) -> Self {
+    pub fn new(
+        query: Message,
+        nameserver: Nameserver,
+        nsas: Arc<NSAddressStore<Recursor>>,
+    ) -> Self {
         Sender {
             query,
             nameserver,

@@ -7,6 +7,7 @@ use crate::{
         zone_cache::ZoneCache,
         zone_fetcher::ZoneFetcher,
     },
+    resolver::Resolver,
     Recursor,
 };
 use failure;
@@ -24,14 +25,14 @@ const DEFAULT_NAMESERVER_ENTRY_CACHE_SIZE: usize = 3001;
 const MAX_PROBING_NAMESERVER_COUNT: usize = 1000;
 
 #[derive(Clone)]
-pub struct NSAddressStore {
+pub struct NSAddressStore<R> {
     nameservers: Arc<Mutex<NameserverCache>>,
     zones: Arc<Mutex<ZoneCache>>,
     probing_name_servers: Arc<Mutex<HashSet<Name>>>,
-    pub recursor: Option<Recursor>,
+    pub resolver: Option<R>,
 }
 
-impl NSAddressStore {
+impl<R: Resolver> NSAddressStore<R> {
     pub fn new() -> Self {
         NSAddressStore {
             nameservers: Arc::new(Mutex::new(NameserverCache(LruCache::new(
@@ -43,12 +44,12 @@ impl NSAddressStore {
             probing_name_servers: Arc::new(Mutex::new(HashSet::with_capacity(
                 MAX_PROBING_NAMESERVER_COUNT,
             ))),
-            recursor: None,
+            resolver: None,
         }
     }
 
-    pub fn set_resolver(&mut self, recursor: Recursor) {
-        self.recursor = Some(recursor);
+    pub fn set_resolver(&mut self, resolver: R) {
+        self.resolver = Some(resolver);
     }
 
     //this must be invoked in a future
@@ -90,9 +91,9 @@ impl NSAddressStore {
                 );
                 let probing_name_servers = self.probing_name_servers.clone();
                 let done_nameserver = missing_nameserver.clone();
-                let recursor = self.recursor.as_ref().unwrap().clone();
+                let resolver = self.resolver.as_ref().unwrap().clone();
                 spawn(Box::new(
-                    NameserverFetcher::new(missing_nameserver, self.nameservers.clone(), recursor)
+                    NameserverFetcher::new(missing_nameserver, self.nameservers.clone(), resolver)
                         .map(move |_| {
                             let mut probing_name_servers = probing_name_servers.lock().unwrap();
                             done_nameserver.into_iter().for_each(|n| {
@@ -105,10 +106,10 @@ impl NSAddressStore {
         Some(nameserver.unwrap())
     }
 
-    pub fn fetch_zone(&self, zone: Name, depth: usize) -> ZoneFetcher {
+    pub fn fetch_zone(&self, zone: Name, depth: usize) -> ZoneFetcher<R> {
         return ZoneFetcher::new(
             zone,
-            self.recursor.as_ref().unwrap().clone(),
+            self.resolver.as_ref().unwrap().clone(),
             self.nameservers.clone(),
             self.zones.clone(),
             depth,

@@ -1,4 +1,4 @@
-use crate::{nsas::error::NSASError, Resolver};
+use crate::{nsas::error::NSASError, resolver::Resolver};
 use failure;
 use futures::{future, Future};
 use r53::{
@@ -48,9 +48,12 @@ impl DumbResolver {
 }
 
 impl Resolver for DumbResolver {
-    fn resolve(
+    type Query = Box<Future<Item = Message, Error = failure::Error> + Send>;
+
+    fn new_query(
         &self,
         mut query: Message,
+        _depth: usize,
     ) -> Box<Future<Item = Message, Error = failure::Error> + Send> {
         let question = query.question.as_ref().unwrap();
         let name = question.name.clone();

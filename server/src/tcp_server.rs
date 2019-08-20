@@ -5,7 +5,8 @@ use std::{
     time::Duration,
 };
 
-use crate::handler::{Done, Failed, Query, QueryHandler};
+use crate::handler::{Query, QueryHandler};
+use failure;
 use futures::{future, stream::Stream, Async, Future, Poll};
 use r53::{Message, MessageRender};
 use std::sync::Arc;
@@ -70,7 +71,8 @@ pub struct TcpStreamWrapper<S: QueryHandler> {
     socket: TcpStream,
     send_state: Option<WriteTcpState>,
     read_state: Option<ReadTcpState>,
-    wait_for_handling: Option<Box<dyn Future<Item = Done, Error = Failed> + Send + 'static>>,
+    wait_for_handling:
+        Option<Box<dyn Future<Item = Query, Error = failure::Error> + Send + 'static>>,
     peer_addr: SocketAddr,
     handler: Arc<S>,
     render: MessageRender,
@@ -208,25 +210,27 @@ impl<S: QueryHandler> TcpStreamWrapper<S> {
     fn handle_query(&mut self) -> Poll<(), io::Error> {
         let mut handler_fut = mem::replace(&mut self.wait_for_handling, None).unwrap();
         match handler_fut.poll() {
-            Ok(Async::Ready(Done(query))) => {
-                query.message.rend(&mut self.render);
-                let buffer = self.render.take_data();
-                let len: [u8; 2] = [
-                    (buffer.len() >> 8 & 0xFF) as u8,
-                    (buffer.len() & 0xFF) as u8,
-                ];
-                self.send_state = Some(WriteTcpState::LenBytes {
-                    pos: 0,
-                    length: len,
-                    bytes: buffer,
-                });
+            Ok(Async::Ready(query)) => {
+                if query.done {
+                    query.message.rend(&mut self.render);
+                    let buffer = self.render.take_data();
+                    let len: [u8; 2] = [
+                        (buffer.len() >> 8 & 0xFF) as u8,
+                        (buffer.len() & 0xFF) as u8,
+                    ];
+                    self.send_state = Some(WriteTcpState::LenBytes {
+                        pos: 0,
+                        length: len,
+                        bytes: buffer,
+                    });
+                }
                 return Ok(Async::Ready(()));
             }
             Ok(Async::NotReady) => {
                 self.wait_for_handling = Some(handler_fut);
                 return Ok(Async::NotReady);
             }
-            Err(Failed(_query)) => {
+            Err(_) => {
                 self.read_state = Some(ReadTcpState::LenBytes {
                     pos: 0,
                     bytes: [0u8; 2],

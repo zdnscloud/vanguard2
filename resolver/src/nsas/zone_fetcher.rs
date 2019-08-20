@@ -5,6 +5,7 @@ use crate::{
         nameserver_cache::{self, Nameserver, NameserverCache},
         zone_cache::ZoneCache,
     },
+    resolver::Resolver,
     running_query::RunningQuery,
     Recursor,
 };
@@ -17,24 +18,24 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-enum FetcherState {
-    FetchNS(Name, Box<RunningQuery>),
-    FetchAddress(Name, Box<RunningQuery>, Vec<Name>),
+enum FetcherState<F> {
+    FetchNS(Name, Box<F>),
+    FetchAddress(Name, Box<F>, Vec<Name>),
     Poisoned,
 }
 
-pub struct ZoneFetcher {
-    state: FetcherState,
-    resolver: Recursor,
+pub struct ZoneFetcher<R: Resolver> {
+    state: FetcherState<R::Query>,
+    resolver: R,
     nameservers: Arc<Mutex<NameserverCache>>,
     zones: Arc<Mutex<ZoneCache>>,
     depth: usize,
 }
 
-impl ZoneFetcher {
+impl<R: Resolver> ZoneFetcher<R> {
     pub fn new(
         zone: Name,
-        resolver: Recursor,
+        resolver: R,
         nameservers: Arc<Mutex<NameserverCache>>,
         zones: Arc<Mutex<ZoneCache>>,
         depth: usize,
@@ -53,7 +54,7 @@ impl ZoneFetcher {
     }
 }
 
-impl Future for ZoneFetcher {
+impl<R: Resolver> Future for ZoneFetcher<R> {
     type Item = Nameserver;
     type Error = failure::Error;
 
@@ -150,7 +151,6 @@ impl Future for ZoneFetcher {
     }
 }
 
-/*
 mod test {
     use super::*;
     use crate::nsas::test_helper::DumbResolver;
@@ -186,6 +186,7 @@ mod test {
             resolver,
             nameservers.clone(),
             zones.clone(),
+            0,
         );
         assert_eq!(nameservers.lock().unwrap().len(), 0);
 
@@ -207,13 +208,13 @@ mod test {
             vec![
                 RData::from_str(RRType::NS, "ns1.knet.cn").unwrap(),
                 RData::from_str(RRType::NS, "ns2.knet.cn").unwrap(),
-                RData::from_str(RRType::NS, "ns3.knet.cn").unwrap(),
+                RData::from_str(RRType::NS, "ns3.knet.com").unwrap(),
             ],
             Vec::new(),
         );
 
         resolver.set_answer(
-            Name::new("ns3.knet.cn").unwrap(),
+            Name::new("ns3.knet.com").unwrap(),
             RRType::A,
             vec![
                 RData::from_str(RRType::A, "1.1.1.1").unwrap(),
@@ -229,16 +230,16 @@ mod test {
             resolver,
             nameservers.clone(),
             zones.clone(),
+            0,
         );
 
         let mut rt = Runtime::new().unwrap();
         let select_nameserver = rt.block_on(fetcher).unwrap();
 
-        assert_eq!(select_nameserver.name, Name::new("ns3.knet.cn").unwrap());
+        assert_eq!(select_nameserver.name, Name::new("ns3.knet.com").unwrap());
         assert_eq!(select_nameserver.address, Ipv4Addr::new(1, 1, 1, 1));
 
         assert_eq!(nameservers.lock().unwrap().len(), 1);
         assert_eq!(zones.lock().unwrap().len(), 1);
     }
 }
-*/

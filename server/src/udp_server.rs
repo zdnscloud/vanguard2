@@ -78,12 +78,12 @@ impl<S: QueryHandler> Future for UdpServer<S> {
                 self.handler
                     .handle_query(query)
                     .map(move |response| {
-                        if let Err(e) = sender.send_response(response.0) {
+                        if let Err(e) = sender.send_response(response) {
                             println!("send response get err {}", e);
                         }
                     })
                     .map_err(|err| {
-                        println!("query {:?} is dropped", err.0);
+                        println!("query {:?} is dropped", err);
                     }),
             );
         }
