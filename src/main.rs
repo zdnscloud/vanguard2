@@ -9,67 +9,45 @@ use std::thread;
 use tokio::runtime::current_thread;
 
 use vanguard2::auth::{AuthServer, DynamicUpdateHandler};
+use vanguard2::config::VanguardConfig;
 use vanguard2::server::{start_qps_calculate, Server};
 
 fn main() {
     let matches = App::new("auth")
         .arg(
-            Arg::with_name("dns_server")
-                .help("dns server address")
-                .long("dns")
-                .required(false)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("rpc_server")
-                .help("rpc server address")
-                .long("rpc")
-                .required(false)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("forwarder")
-                .help("dns recursive server address to forward request")
-                .long("forwarder")
-                .required(false)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("metrics")
-                .help("dns recursive server address to forward request")
-                .long("metrics")
+            Arg::with_name("config")
+                .help("config file path")
+                .long("config")
                 .required(false)
                 .takes_value(true),
         )
         .get_matches();
 
-    let addr = matches
-        .value_of("dns_server")
-        .unwrap_or("0.0.0.0:53")
-        .to_string();
-    let dns_addr = addr.parse::<SocketAddr>().unwrap();
-    println!("Listening on: {}", dns_addr);
+    let config_file = matches.value_of("config").unwrap_or("vanguard.conf");
 
-    let auth_server = AuthServer::new();
-    let dynamic_server = DynamicUpdateHandler::new(auth_server.zones());
-    let resolver = resolver::Resolver::new(auth_server);
-    let server = Server::new(dns_addr, resolver);
+    match VanguardConfig::load_config(config_file) {
+        Err(e) => {
+            eprintln!("load configure file failed: {:?}", e);
+            return;
+        }
+        Ok(config) => {
+            let auth_server = AuthServer::new(&config.auth);
+            let dynamic_server = DynamicUpdateHandler::new(auth_server.zones());
+            let resolver = resolver::Resolver::new(auth_server, &config);
+            let server = Server::new(&config.server, resolver);
 
-    let addr = matches.value_of("rpc_server").unwrap_or("0.0.0.0:5555");
-    let addr_and_port = addr.split(":").collect::<Vec<&str>>();
-    let _handler = dynamic_server.run(
-        addr_and_port[0].to_string(),
-        addr_and_port[1].parse().unwrap(),
-    );
+            let addr_and_port = config.vg_ctrl.address.split(":").collect::<Vec<&str>>();
+            let _handler = dynamic_server.run(
+                addr_and_port[0].to_string(),
+                addr_and_port[1].parse().unwrap(),
+            );
 
-    let addr = matches
-        .value_of("metrics")
-        .unwrap_or("0.0.0.0:9100")
-        .to_string();
-    let addr = addr.parse::<SocketAddr>().unwrap();
-    start_metrics(addr);
+            let addr = config.metrics.address.parse::<SocketAddr>().unwrap();
+            start_metrics(addr);
 
-    tokio::run(server.into_future());
+            tokio::run(server.into_future());
+        }
+    }
 }
 
 fn start_metrics(addr: SocketAddr) {

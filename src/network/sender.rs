@@ -1,8 +1,5 @@
-use super::{
-    error::RecursorError,
-    nsas::{AbstractNameserver, NSAddressStore, Nameserver, NameserverStore},
-    Recursor,
-};
+use super::nameserver_store::{Nameserver, NameserverStore};
+use crate::error::VgError;
 use failure;
 use futures::{prelude::*, Future};
 use r53::{Message, MessageRender};
@@ -36,7 +33,7 @@ pub struct Sender<S, SS> {
     state: State,
 }
 
-impl<S: AbstractNameserver, SS: NameserverStore<S>> Sender<S, SS> {
+impl<S: Nameserver, SS: NameserverStore<S>> Sender<S, SS> {
     pub fn new(query: Message, nameserver: S, nsas: Arc<SS>) -> Self {
         Sender {
             query,
@@ -47,7 +44,7 @@ impl<S: AbstractNameserver, SS: NameserverStore<S>> Sender<S, SS> {
     }
 }
 
-impl<S: AbstractNameserver, SS: NameserverStore<S>> Future for Sender<S, SS> {
+impl<S: Nameserver, SS: NameserverStore<S>> Future for Sender<S, SS> {
     type Item = Message;
     type Error = failure::Error;
 
@@ -66,7 +63,7 @@ impl<S: AbstractNameserver, SS: NameserverStore<S>> Future for Sender<S, SS> {
                     Err(e) => {
                         self.nameserver.set_unreachable();
                         self.nsas.update_nameserver_rtt(&self.nameserver);
-                        return Err(RecursorError::IoError(e).into());
+                        return Err(VgError::IoError(e).into());
                     }
                     Ok(Async::NotReady) => {
                         self.state = State::Send(fut);
@@ -84,18 +81,16 @@ impl<S: AbstractNameserver, SS: NameserverStore<S>> Future for Sender<S, SS> {
                     Err(e) => {
                         self.nameserver.set_unreachable();
                         self.nsas.update_nameserver_rtt(&self.nameserver);
-                        return Err(RecursorError::IoError(e).into());
+                        return Err(VgError::IoError(e).into());
                     }
                     Ok(Async::NotReady) => match delay.poll() {
                         Err(e) => {
-                            return Err(RecursorError::TimerErr(e.description().to_string()).into());
+                            return Err(VgError::TimerErr(e.description().to_string()).into());
                         }
                         Ok(Async::Ready(_)) => {
                             self.nameserver.set_rtt(DEFAULT_RECV_TIMEOUT);
                             self.nsas.update_nameserver_rtt(&self.nameserver);
-                            return Err(
-                                RecursorError::Timeout(self.nameserver.get_addr().ip()).into()
-                            );
+                            return Err(VgError::Timeout(self.nameserver.get_addr().ip()).into());
                         }
                         Ok(Async::NotReady) => {
                             self.state = State::Recv(fut, delay, send_time);

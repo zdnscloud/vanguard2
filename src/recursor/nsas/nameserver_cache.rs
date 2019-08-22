@@ -1,8 +1,8 @@
 use super::{
     address_entry::{self, AddressEntry},
     entry_key::EntryKey,
-    nameserver_store::AbstractNameserver,
 };
+use crate::network;
 use lru::LruCache;
 use r53::Name;
 use std::{
@@ -19,7 +19,7 @@ pub struct Nameserver {
     rtt: Duration,
 }
 
-impl AbstractNameserver for Nameserver {
+impl network::Nameserver for Nameserver {
     fn get_addr(&self) -> SocketAddr {
         SocketAddr::new(self.address, 53)
     }

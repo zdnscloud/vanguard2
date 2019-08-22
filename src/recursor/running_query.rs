@@ -1,10 +1,9 @@
 use super::{
-    error::RecursorError,
     message_classifier::{classify_response, ResponseCategory},
     nsas::{NSAddressStore, Nameserver, ZoneFetcher},
     recursor::{Recursor, Resolver},
-    sender::Sender,
 };
+use crate::{error::VgError, network::Sender};
 use failure;
 use futures::{future, prelude::*, Future};
 use r53::{message::SectionType, name, Message, MessageBuilder, Name, RData, RRType, Rcode};
@@ -214,7 +213,7 @@ impl Future for RunningQuery {
                                     self.current_type.to_string(),
                                     self.depth,
                                 );
-                                return Err(RecursorError::LoopedQuery.into());
+                                return Err(VgError::LoopedQuery.into());
                             }
 
                             self.state = State::GetNameServer(self.recursor.nsas.fetch_zone(
@@ -245,7 +244,7 @@ impl Future for RunningQuery {
                 },
                 State::QueryAuthServer(mut sender) => match sender.poll() {
                     Err(e) => {
-                        return Err(RecursorError::TimerErr(format!("{:?}", e)).into());
+                        return Err(VgError::TimerErr(format!("{:?}", e)).into());
                     }
                     Ok(Async::NotReady) => {
                         self.state = State::QueryAuthServer(sender);

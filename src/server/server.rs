@@ -1,6 +1,7 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 use super::{handler::QueryHandler, tcp_server::TcpServer, udp_server::UdpServer};
+use crate::config::ServerConfig;
 use futures::{future, Future};
 use tokio::executor::spawn;
 
@@ -10,7 +11,8 @@ pub struct Server<S: QueryHandler> {
 }
 
 impl<S: QueryHandler + 'static> Server<S> {
-    pub fn new(addr: SocketAddr, handler: S) -> Self {
+    pub fn new(conf: &ServerConfig, handler: S) -> Self {
+        let addr = conf.address.parse().unwrap();
         Server { addr, handler }
     }
 

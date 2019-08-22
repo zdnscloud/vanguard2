@@ -1,4 +1,4 @@
-use crate::nsas::AbstractNameserver;
+use crate::network::Nameserver;
 use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
     net::SocketAddr,
@@ -13,7 +13,13 @@ pub struct Forwarder {
     rtt: u64,
 }
 
-impl AbstractNameserver for Forwarder {
+impl Forwarder {
+    pub fn new(address: SocketAddr) -> Self {
+        Forwarder { address, rtt: 0 }
+    }
+}
+
+impl Nameserver for Forwarder {
     #[inline]
     fn get_addr(&self) -> SocketAddr {
         self.address

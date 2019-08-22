@@ -1,9 +1,10 @@
 use super::zones::AuthZone;
-use crate::server::Query;
+use crate::{config::AuthorityConfig, server::Query};
 use failure;
 use futures::{prelude::*, Future};
 use std::sync::{Arc, RwLock};
 
+#[derive(Clone)]
 pub struct AuthServer {
     zones: Arc<RwLock<AuthZone>>,
 }
@@ -14,7 +15,7 @@ pub struct AuthFuture {
 }
 
 impl AuthServer {
-    pub fn new() -> Self {
+    pub fn new(conf: &AuthorityConfig) -> Self {
         AuthServer {
             zones: Arc::new(RwLock::new(AuthZone::new())),
         }

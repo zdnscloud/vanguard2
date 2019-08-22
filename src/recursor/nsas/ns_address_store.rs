@@ -1,10 +1,10 @@
+use crate::network::NameserverStore;
 use crate::recursor::{
     nsas::{
         address_entry,
         entry_key::EntryKey,
         nameserver_cache::{self, Nameserver, NameserverCache},
         nameserver_fetcher::NameserverFetcher,
-        nameserver_store::NameserverStore,
         zone_cache::ZoneCache,
         zone_fetcher::ZoneFetcher,
     },
@@ -26,7 +26,7 @@ const DEFAULT_NAMESERVER_ENTRY_CACHE_SIZE: usize = 3001;
 const MAX_PROBING_NAMESERVER_COUNT: usize = 1000;
 
 #[derive(Clone)]
-pub struct NSAddressStore<R> {
+pub struct NSAddressStore<R: Clone> {
     nameservers: Arc<Mutex<NameserverCache>>,
     zones: Arc<Mutex<ZoneCache>>,
     probing_name_servers: Arc<Mutex<HashSet<Name>>>,

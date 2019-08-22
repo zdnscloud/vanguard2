@@ -199,7 +199,6 @@ mod test {
         assert_eq!(zones.lock().unwrap().len(), 1);
     }
 
-    #[test]
     fn test_fetch_without_glue() {
         let mut resolver = DumbResolver::new();
         resolver.set_answer(

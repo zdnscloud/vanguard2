@@ -1,26 +1,28 @@
 use failure;
 use futures::{prelude::*, Future};
-use std::{mem, sync::Arc};
+use std::mem;
 
 use vanguard2::{
     auth::{AuthFuture, AuthServer},
+    config::VanguardConfig,
+    forwarder::{ForwarderFuture, ForwarderManager},
     recursor::{Recursor, RecursorFuture},
     server::{Query, QueryHandler},
 };
 
 #[derive(Clone)]
 pub struct Resolver {
-    auth: Arc<AuthServer>,
-    recursor: Arc<Recursor>,
-    //forwarder: Arc<ForwarderManager>,
+    auth: AuthServer,
+    recursor: Recursor,
+    forwarder: ForwarderManager,
 }
 
 impl Resolver {
-    pub fn new(auth: AuthServer) -> Self {
-        let recursor = Arc::new(Recursor::new());
+    pub fn new(auth: AuthServer, conf: &VanguardConfig) -> Self {
         Resolver {
-            auth: Arc::new(auth),
-            recursor,
+            auth: auth,
+            recursor: Recursor::new(&conf.recursor),
+            forwarder: ForwarderManager::new(&conf.forwarder),
         }
     }
 }
@@ -34,7 +36,7 @@ impl QueryHandler for Resolver {
 
 enum State {
     Auth(AuthFuture),
-    //Forwarding(ForwarderFuture),
+    Forwarding(ForwarderFuture),
     Recursor(RecursorFuture),
     Poisoned,
 }
@@ -64,6 +66,23 @@ impl Future for ResolverFuture {
                 State::Auth(mut fut) => match fut.poll() {
                     Err(_) | Ok(Async::NotReady) => {
                         unreachable!();
+                    }
+                    Ok(Async::Ready(query)) => {
+                        if query.done {
+                            return Ok(Async::Ready(query));
+                        } else {
+                            self.state =
+                                State::Forwarding(self.resolver.forwarder.handle_query(query));
+                        }
+                    }
+                },
+                State::Forwarding(mut fut) => match fut.poll() {
+                    Err(e) => {
+                        return Err(e);
+                    }
+                    Ok(Async::NotReady) => {
+                        self.state = State::Forwarding(fut);
+                        return Ok(Async::NotReady);
                     }
                     Ok(Async::Ready(query)) => {
                         if query.done {
