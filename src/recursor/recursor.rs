@@ -20,7 +20,7 @@ pub trait Resolver: Clone + Send + 'static {
 #[derive(Clone)]
 pub struct Recursor {
     pub(crate) cache: Arc<Mutex<MessageCache>>,
-    pub(crate) nsas: Arc<NSAddressStore<Recursor>>,
+    pub(crate) nsas: NSAddressStore,
     pub(crate) roothint: Arc<RootHint>,
 }
 
@@ -28,18 +28,11 @@ pub type RecursorFuture = MessageFutureAdaptor<RunningQuery>;
 
 impl Recursor {
     pub fn new(conf: &RecursorConfig) -> Self {
-        let nsas = Arc::new(NSAddressStore::new());
-        let mut recursor = Recursor {
+        Recursor {
             cache: Arc::new(Mutex::new(MessageCache::new(DEFAULT_MESSAGE_CACHE_SIZE))),
-            nsas: Arc::clone(&nsas),
+            nsas: NSAddressStore::new(),
             roothint: Arc::new(RootHint::new()),
-        };
-
-        unsafe {
-            let pointer = Arc::into_raw(nsas) as *mut NSAddressStore<Recursor>;
-            (*pointer).set_resolver(recursor.clone());
         }
-        recursor
     }
 
     pub fn handle_query(&self, query: Query) -> RecursorFuture {

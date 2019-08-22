@@ -5,10 +5,10 @@ use crate::{
 };
 use datasrc::RBTree;
 use r53::Name;
-use std::{cell::Cell, cmp::Eq, net::SocketAddr, ops::Rem, str::FromStr, sync::RwLock};
+use std::{cell::Cell, cmp::Eq, net::SocketAddr, ops::Rem, str::FromStr};
 
 pub struct ForwarderPool {
-    forwarders: RwLock<Vec<Forwarder>>,
+    forwarders: Vec<Forwarder>,
 }
 
 impl ForwarderPool {
@@ -23,12 +23,11 @@ impl ForwarderPool {
             }
         }
         ForwarderPool {
-            forwarders: RwLock::new(forwarders),
+            forwarders: forwarders,
         }
     }
 
     pub fn init_groups(&self, groups: &mut RBTree<ForwarderGroup>, conf: &ForwarderConfig) {
-        let forwarders = self.forwarders.read().unwrap();
         for conf in &conf.forwarders {
             let name = Name::new(conf.zone_name.as_ref()).unwrap();
             let indexes = conf
@@ -37,7 +36,7 @@ impl ForwarderPool {
                 .fold(Vec::new(), |mut indexes, address| {
                     let address = address.parse().unwrap();
                     indexes.push(
-                        forwarders
+                        self.forwarders
                             .iter()
                             .position(|f| f.get_addr() == address)
                             .unwrap(),
@@ -49,17 +48,13 @@ impl ForwarderPool {
     }
 
     pub fn get_forwarder(&self, index: usize) -> Forwarder {
-        let forwarders = self.forwarders.read().unwrap();
-        forwarders[index]
+        self.forwarders[index]
     }
-}
 
-impl NameserverStore<Forwarder> for ForwarderPool {
-    fn update_nameserver_rtt(&self, nameserver: &Forwarder) {
-        let mut forwarders = self.forwarders.write().unwrap();
-        let position = forwarders.iter().position(|s| s == nameserver);
+    pub fn update_rtt(&mut self, forwarder: &Forwarder) {
+        let position = self.forwarders.iter().position(|s| s == forwarder);
         if let Some(pos) = position {
-            forwarders[pos].set_rtt(nameserver.get_rtt());
+            self.forwarders[pos].set_rtt(forwarder.get_rtt());
         }
     }
 }

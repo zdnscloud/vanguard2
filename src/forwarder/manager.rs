@@ -10,12 +10,16 @@ use crate::{
 use datasrc::RBTree;
 use futures::{prelude::*, Future};
 use r53::Name;
-use std::{mem, net::SocketAddr, sync::Arc};
+use std::{
+    mem,
+    net::SocketAddr,
+    sync::{Arc, RwLock},
+};
 
 #[derive(Clone)]
 pub struct ForwarderManager {
     forwarders: Arc<RBTree<ForwarderGroup>>,
-    pool: Arc<ForwarderPool>,
+    pool: Arc<RwLock<ForwarderPool>>,
 }
 
 impl ForwarderManager {
@@ -25,7 +29,7 @@ impl ForwarderManager {
         pool.init_groups(&mut groups, conf);
         ForwarderManager {
             forwarders: Arc::new(groups),
-            pool: Arc::new(pool),
+            pool: Arc::new(RwLock::new(pool)),
         }
     }
 
@@ -41,16 +45,24 @@ impl ForwarderManager {
     fn get_forwarder(&self, name: &Name) -> Option<Forwarder> {
         let result = self.forwarders.find(name);
         if let Some(selecotr) = result.get_value() {
-            return Some(selecotr.select_forwarder(&*self.pool));
+            let pool = self.pool.read().unwrap();
+            return Some(selecotr.select_forwarder(&pool));
         } else {
             return None;
         }
     }
 }
 
+impl NameserverStore<Forwarder> for ForwarderManager {
+    fn update_nameserver_rtt(&self, forwarder: &Forwarder) {
+        let mut pool = self.pool.write().unwrap();
+        pool.update_rtt(forwarder);
+    }
+}
+
 enum State {
     NoForwarder(Query),
-    Send((SocketAddr, Sender<Forwarder, ForwarderPool>)),
+    Send((SocketAddr, Sender<Forwarder, ForwarderManager>)),
     Poisoned,
 }
 
@@ -63,7 +75,7 @@ impl ForwarderFuture {
         let state = if let Some(forwarder) = forwarder {
             State::Send((
                 query.client,
-                Sender::new(query.message, forwarder, manager.pool.clone()),
+                Sender::new(query.message, forwarder, manager.clone()),
             ))
         } else {
             State::NoForwarder(query)

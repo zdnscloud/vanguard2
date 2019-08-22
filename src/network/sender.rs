@@ -29,12 +29,12 @@ enum State {
 pub struct Sender<S, SS> {
     query: Message,
     nameserver: S,
-    nsas: Arc<SS>,
+    nsas: SS,
     state: State,
 }
 
 impl<S: Nameserver, SS: NameserverStore<S>> Sender<S, SS> {
-    pub fn new(query: Message, nameserver: S, nsas: Arc<SS>) -> Self {
+    pub fn new(query: Message, nameserver: S, nsas: SS) -> Self {
         Sender {
             query,
             nameserver,

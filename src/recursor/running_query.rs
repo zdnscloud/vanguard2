@@ -15,7 +15,7 @@ const MAX_QUERY_DEPTH: usize = 10;
 enum State {
     Init,
     GetNameServer(ZoneFetcher<Recursor>),
-    QueryAuthServer(Sender<Nameserver, NSAddressStore<Recursor>>),
+    QueryAuthServer(Sender<Nameserver, NSAddressStore>),
     Poisoned,
 }
 
@@ -198,7 +198,7 @@ impl Future for RunningQuery {
                         if let Some(nameserver) = self
                             .recursor
                             .nsas
-                            .get_nameserver(self.current_zone.as_ref().unwrap())
+                            .get_nameserver(self.current_zone.as_ref().unwrap(), &self.recursor)
                         {
                             self.state = State::QueryAuthServer(Sender::new(
                                 self.query.as_ref().unwrap().clone(),
@@ -219,6 +219,7 @@ impl Future for RunningQuery {
                             self.state = State::GetNameServer(self.recursor.nsas.fetch_zone(
                                 self.current_zone.as_ref().unwrap().clone(),
                                 self.depth,
+                                self.recursor.clone(),
                             ));
                         }
                     }
