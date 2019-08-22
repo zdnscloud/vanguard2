@@ -2,13 +2,14 @@ extern crate futures;
 extern crate tokio;
 mod resolver;
 
-use auth::{AuthServer, DynamicUpdateHandler};
 use clap::{App, Arg};
 use metrics::start_metric_server;
-use server::{start_qps_calculate, Server};
 use std::net::SocketAddr;
 use std::thread;
 use tokio::runtime::current_thread;
+
+use vanguard2::auth::{AuthServer, DynamicUpdateHandler};
+use vanguard2::server::{start_qps_calculate, Server};
 
 fn main() {
     let matches = App::new("auth")
