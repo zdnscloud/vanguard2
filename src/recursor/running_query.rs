@@ -212,12 +212,19 @@ impl Future for RunningQuery {
                         {
                             self.state = State::Forward(fut);
                         } else {
-                            self.state = State::GetNameServer(NameserverFuture::new(
+                            match NameserverFuture::new(
                                 self.current_zone.as_ref().unwrap().clone(),
                                 &self.recursor,
                                 &self.recursor.nsas,
                                 self.depth,
-                            ));
+                            ) {
+                                Ok(fut) => {
+                                    self.state = State::GetNameServer(fut);
+                                }
+                                Err(e) => {
+                                    return Err(e);
+                                }
+                            }
                         }
                     }
                     Some(resp) => {

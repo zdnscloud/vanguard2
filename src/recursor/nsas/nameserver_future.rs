@@ -12,13 +12,10 @@ const MAX_QUERY_DEPTH: usize = 10;
 
 enum State {
     HitCache(
-        (
-            Nameserver,
-            Option<Box<dyn Future<Item = (), Error = ()> + Send>>,
-        ),
+        Nameserver,
+        Option<Box<dyn Future<Item = (), Error = ()> + Send>>,
     ),
     FetchNameserver(ZoneFetcher<Recursor>),
-    ToodeepQuery,
     Poisoned,
 }
 
@@ -32,16 +29,18 @@ impl NameserverFuture {
         resolver: &Recursor,
         address_store: &NSAddressStore,
         depth: usize,
-    ) -> Self {
+    ) -> failure::Result<Self> {
+        if depth > MAX_QUERY_DEPTH {
+            return Err(VgError::LoopedQuery.into());
+        }
+
         let (nameserver, probefut) = address_store.get_nameserver(&zone, resolver);
         let state = if let Some(nameserver) = nameserver {
-            State::HitCache((nameserver, probefut))
-        } else if depth > MAX_QUERY_DEPTH {
-            State::ToodeepQuery
+            State::HitCache(nameserver, probefut)
         } else {
             State::FetchNameserver(address_store.fetch_zone(zone, depth, resolver.clone()))
         };
-        NameserverFuture { state }
+        Ok(NameserverFuture { state })
     }
 }
 
@@ -50,32 +49,27 @@ impl Future for NameserverFuture {
     type Error = failure::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        loop {
-            match mem::replace(&mut self.state, State::Poisoned) {
-                State::HitCache((nameserver, probefut)) => {
-                    if let Some(probefut) = probefut {
-                        spawn(probefut);
-                    }
+        match mem::replace(&mut self.state, State::Poisoned) {
+            State::HitCache(nameserver, probefut) => {
+                if let Some(probefut) = probefut {
+                    spawn(probefut);
+                }
+                return Ok(Async::Ready(nameserver));
+            }
+            State::FetchNameserver(mut fetcher) => match fetcher.poll() {
+                Err(e) => {
+                    return Err(e);
+                }
+                Ok(Async::NotReady) => {
+                    self.state = State::FetchNameserver(fetcher);
+                    return Ok(Async::NotReady);
+                }
+                Ok(Async::Ready(nameserver)) => {
                     return Ok(Async::Ready(nameserver));
                 }
-                State::FetchNameserver(mut fetcher) => match fetcher.poll() {
-                    Err(e) => {
-                        return Err(e);
-                    }
-                    Ok(Async::NotReady) => {
-                        self.state = State::FetchNameserver(fetcher);
-                        return Ok(Async::NotReady);
-                    }
-                    Ok(Async::Ready(nameserver)) => {
-                        return Ok(Async::Ready(nameserver));
-                    }
-                },
-                State::ToodeepQuery => {
-                    return Err(VgError::LoopedQuery.into());
-                }
-                State::Poisoned => {
-                    panic!("nsas future state is corrupted");
-                }
+            },
+            State::Poisoned => {
+                panic!("nsas future state is corrupted");
             }
         }
     }
