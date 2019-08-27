@@ -1,7 +1,8 @@
 use super::{
-    cache::MessageCache, nsas::NSAddressStore, roothint::RootHint, running_query::RunningQuery,
+    cache::MessageCache, forwarder::ForwarderManager, nsas::NSAddressStore,
+    recursor_future::RecursorFuture, roothint::RootHint, running_query::RunningQuery,
 };
-use crate::{config::RecursorConfig, error::VgError, network::MessageFutureAdaptor, server::Query};
+use crate::{config::ForwarderConfig, config::RecursorConfig, error::VgError, server::Query};
 use failure;
 use futures::Future;
 use r53::{name, Message, Name, RRType};
@@ -22,23 +23,21 @@ pub struct Recursor {
     pub(crate) cache: Arc<Mutex<MessageCache>>,
     pub(crate) nsas: NSAddressStore,
     pub(crate) roothint: Arc<RootHint>,
+    pub(crate) forwarder: ForwarderManager,
 }
 
-pub type RecursorFuture = MessageFutureAdaptor<RunningQuery>;
-
 impl Recursor {
-    pub fn new(conf: &RecursorConfig) -> Self {
+    pub fn new(recursor_cfg: &RecursorConfig, forwarder_cfg: &ForwarderConfig) -> Self {
         Recursor {
             cache: Arc::new(Mutex::new(MessageCache::new(DEFAULT_MESSAGE_CACHE_SIZE))),
             nsas: NSAddressStore::new(),
             roothint: Arc::new(RootHint::new()),
+            forwarder: ForwarderManager::new(forwarder_cfg),
         }
     }
 
     pub fn handle_query(&self, query: Query) -> RecursorFuture {
-        let client = query.client;
-        let fut = RunningQuery::new(query.message, self.clone(), 1);
-        MessageFutureAdaptor::new(client, fut)
+        RecursorFuture::new(self.clone(), query)
     }
 }
 

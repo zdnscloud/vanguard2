@@ -16,7 +16,7 @@ use tokio::{
     util::FutureExt,
 };
 
-const DEFAULT_RECV_TIMEOUT: Duration = Duration::from_secs(1); //3 secs
+const DEFAULT_RECV_TIMEOUT: Duration = Duration::from_secs(2); //3 secs
 const DEFAULT_RECV_BUF_SIZE: usize = 1024;
 
 enum State {
@@ -70,9 +70,16 @@ impl<S: Nameserver, SS: NameserverStore<S>> Future for Sender<S, SS> {
                         return Ok(Async::NotReady);
                     }
                     Ok(Async::Ready((socket, _))) => {
+                        let timeout = {
+                            let mut rtt = self.nameserver.get_rtt();
+                            if rtt.as_millis() == 0 || rtt > DEFAULT_RECV_TIMEOUT {
+                                rtt = DEFAULT_RECV_TIMEOUT;
+                            }
+                            rtt
+                        };
                         self.state = State::Recv(
                             socket.recv_dgram(vec![0; DEFAULT_RECV_BUF_SIZE]),
-                            Delay::new(Instant::now().checked_add(DEFAULT_RECV_TIMEOUT).unwrap()),
+                            Delay::new(Instant::now().checked_add(timeout).unwrap()),
                             Instant::now(),
                         );
                     }
@@ -90,7 +97,10 @@ impl<S: Nameserver, SS: NameserverStore<S>> Future for Sender<S, SS> {
                         Ok(Async::Ready(_)) => {
                             self.nameserver.set_rtt(DEFAULT_RECV_TIMEOUT);
                             self.nsas.update_nameserver_rtt(&self.nameserver);
-                            return Err(VgError::Timeout(self.nameserver.get_addr().ip()).into());
+                            return Err(VgError::Timeout(
+                                self.nameserver.get_addr().ip().to_string(),
+                            )
+                            .into());
                         }
                         Ok(Async::NotReady) => {
                             self.state = State::Recv(fut, delay, send_time);

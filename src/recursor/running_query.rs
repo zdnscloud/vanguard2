@@ -1,20 +1,22 @@
 use super::{
+    forwarder::{Forwarder, ForwarderManager},
     message_classifier::{classify_response, ResponseCategory},
-    nsas::{NSAddressStore, Nameserver, ZoneFetcher},
+    nsas::{NSAddressStore, Nameserver, NameserverFuture},
     recursor::{Recursor, Resolver},
+    util::Sender,
 };
-use crate::{error::VgError, network::Sender};
+use crate::error::VgError;
 use failure;
 use futures::{future, prelude::*, Future};
 use r53::{message::SectionType, name, Message, MessageBuilder, Name, RData, RRType, Rcode};
 use std::{mem, time::Duration};
 
 const MAX_CNAME_DEPTH: usize = 12;
-const MAX_QUERY_DEPTH: usize = 10;
 
 enum State {
     Init,
-    GetNameServer(ZoneFetcher<Recursor>),
+    Forward(Sender<Forwarder, ForwarderManager>),
+    GetNameServer(NameserverFuture),
     QueryAuthServer(Sender<Nameserver, NSAddressStore>),
     Poisoned,
 }
@@ -24,7 +26,6 @@ pub struct RunningQuery {
     current_type: RRType,
     current_zone: Option<Name>,
     cname_depth: usize,
-    query: Option<Message>,
     response: Option<Message>,
     recursor: Recursor,
     state: State,
@@ -42,7 +43,6 @@ impl RunningQuery {
             current_type,
             current_zone: None,
             cname_depth: 0,
-            query: Some(query.clone()),
             response: Some(query),
             recursor,
             state: State::Init,
@@ -50,32 +50,43 @@ impl RunningQuery {
         }
     }
 
+    pub fn reset(&mut self) {
+        let query = self.response.as_mut().unwrap();
+        query.take_section(SectionType::Answer);
+        query.take_section(SectionType::Authority);
+        query.take_section(SectionType::Additional);
+        let question = query.question.as_ref().unwrap();
+        self.current_name = question.name.clone();
+        self.current_type = question.typ;
+        self.current_zone = None;
+        self.cname_depth = 0;
+        self.state = State::Init;
+        self.depth = 0;
+    }
+
     fn lookup_in_cache(&mut self) -> Option<Message> {
-        let found_in_cache = self
-            .recursor
-            .cache
-            .lock()
-            .unwrap()
-            .gen_response(self.query.as_mut().unwrap());
+        let mut current_query = Message::with_query(self.current_name.clone(), self.current_type);
+
+        let cache = self.recursor.cache.clone();
+        let mut cache = cache.lock().unwrap();
+        let found_in_cache = cache.gen_response(&mut current_query);
         if found_in_cache {
-            let last_answer = self.query.take().unwrap();
-            return Some(self.make_response(last_answer));
+            let response = self.make_response(current_query);
+            let origin_query_name = &response.question.as_ref().unwrap().name;
+            if !origin_query_name.eq(&self.current_name) {
+                let response_type =
+                    classify_response(origin_query_name, self.current_type, &response);
+                cache.add_response(response_type, response.clone());
+            }
+            return Some(response);
         }
 
-        if let Some(ns) = self
-            .recursor
-            .cache
-            .lock()
-            .unwrap()
-            .get_deepest_ns(&self.current_name)
-        {
+        if let Some(ns) = cache.get_deepest_ns(&self.current_name) {
             self.current_zone = Some(ns);
             return None;
         }
 
-        self.recursor
-            .roothint
-            .fill_cache(&mut self.recursor.cache.lock().unwrap());
+        self.recursor.roothint.fill_cache(&mut cache);
         self.current_zone = Some(name::root());
         return None;
     }
@@ -116,7 +127,6 @@ impl RunningQuery {
                 self.merge_response(response);
                 self.current_name = next.clone();
                 self.current_zone = None;
-                self.query = Some(Message::with_query(next, self.current_type));
                 return Ok(None);
             }
             ResponseCategory::Invalid(_) | ResponseCategory::FormErr => {
@@ -195,37 +205,44 @@ impl Future for RunningQuery {
             match mem::replace(&mut self.state, State::Poisoned) {
                 State::Init => match self.lookup_in_cache() {
                     None => {
-                        if let Some(nameserver) = self
+                        if let Some(fut) = self
                             .recursor
-                            .nsas
-                            .get_nameserver(self.current_zone.as_ref().unwrap(), &self.recursor)
+                            .forwarder
+                            .handle_query(&self.current_name, self.current_type)
                         {
-                            self.state = State::QueryAuthServer(Sender::new(
-                                self.query.as_ref().unwrap().clone(),
-                                nameserver,
-                                self.recursor.nsas.clone(),
-                            ));
+                            self.state = State::Forward(fut);
                         } else {
-                            if self.depth > MAX_QUERY_DEPTH {
-                                println!(
-                                    "----> query {:?}, {:?} {} , failed loop query",
-                                    self.current_name,
-                                    self.current_type.to_string(),
-                                    self.depth,
-                                );
-                                return Err(VgError::LoopedQuery.into());
-                            }
-
-                            self.state = State::GetNameServer(self.recursor.nsas.fetch_zone(
+                            self.state = State::GetNameServer(NameserverFuture::new(
                                 self.current_zone.as_ref().unwrap().clone(),
+                                &self.recursor,
+                                &self.recursor.nsas,
                                 self.depth,
-                                self.recursor.clone(),
                             ));
                         }
                     }
                     Some(resp) => {
                         return Ok(Async::Ready(resp));
                     }
+                },
+                State::Forward(mut sender) => match sender.poll() {
+                    Err(e) => {
+                        return Err(e);
+                    }
+                    Ok(Async::NotReady) => {
+                        self.state = State::Forward(sender);
+                        return Ok(Async::NotReady);
+                    }
+                    Ok(Async::Ready(resp)) => match self.handle_response(resp) {
+                        Err(e) => {
+                            return Err(e);
+                        }
+                        Ok(Some(resp)) => {
+                            return Ok(Async::Ready(resp));
+                        }
+                        Ok(none) => {
+                            self.state = State::Init;
+                        }
+                    },
                 },
                 State::GetNameServer(mut fetcher) => match fetcher.poll() {
                     Err(e) => {
@@ -237,7 +254,7 @@ impl Future for RunningQuery {
                     }
                     Ok(Async::Ready(nameserver)) => {
                         self.state = State::QueryAuthServer(Sender::new(
-                            self.query.as_ref().unwrap().clone(),
+                            Message::with_query(self.current_name.clone(), self.current_type),
                             nameserver,
                             self.recursor.nsas.clone(),
                         ));
@@ -258,7 +275,7 @@ impl Future for RunningQuery {
                         Ok(Some(resp)) => {
                             return Ok(Async::Ready(resp));
                         }
-                        Ok(None) => {
+                        Ok(none) => {
                             self.state = State::Init;
                         }
                     },

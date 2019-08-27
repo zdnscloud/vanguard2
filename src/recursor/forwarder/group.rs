@@ -1,7 +1,7 @@
 use super::forwarder::Forwarder;
 use crate::{
     config::ForwarderConfig,
-    network::{Nameserver, NameserverStore},
+    recursor::util::{Nameserver, NameserverStore},
 };
 use datasrc::RBTree;
 use r53::Name;

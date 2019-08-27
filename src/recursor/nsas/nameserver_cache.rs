@@ -2,7 +2,7 @@ use super::{
     address_entry::{self, AddressEntry},
     entry_key::EntryKey,
 };
-use crate::network;
+use crate::recursor::util;
 use lru::LruCache;
 use r53::Name;
 use std::{
@@ -19,15 +19,23 @@ pub struct Nameserver {
     rtt: Duration,
 }
 
-impl network::Nameserver for Nameserver {
+impl util::Nameserver for Nameserver {
+    #[inline]
     fn get_addr(&self) -> SocketAddr {
         SocketAddr::new(self.address, 53)
     }
 
+    #[inline]
     fn set_rtt(&mut self, rtt: Duration) {
         self.rtt = rtt;
     }
 
+    #[inline]
+    fn get_rtt(&self) -> Duration {
+        self.rtt
+    }
+
+    #[inline]
     fn set_unreachable(&mut self) {
         self.rtt = Duration::from_nanos(address_entry::UNREACHABLE_RTT);
     }

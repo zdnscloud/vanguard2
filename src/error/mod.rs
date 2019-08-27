@@ -8,7 +8,7 @@ pub enum VgError {
     IoError(#[fail(cause)] io::Error),
 
     #[fail(display = "query {} timed out", _0)]
-    Timeout(IpAddr),
+    Timeout(String),
 
     #[fail(display = "timer error {}", _0)]
     TimerErr(String),

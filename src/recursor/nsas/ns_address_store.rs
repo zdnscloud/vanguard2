@@ -1,4 +1,3 @@
-use crate::network::NameserverStore;
 use crate::recursor::{
     nsas::{
         address_entry,
@@ -9,6 +8,7 @@ use crate::recursor::{
         zone_fetcher::ZoneFetcher,
     },
     recursor::Resolver,
+    util::NameserverStore,
     Recursor,
 };
 use failure;
@@ -48,15 +48,24 @@ impl NSAddressStore {
     }
 
     //this must be invoked in a future
-    pub fn get_nameserver(&self, zone: &Name, resolver: &Recursor) -> Option<Nameserver> {
+    pub fn get_nameserver(
+        &self,
+        zone: &Name,
+        resolver: &Recursor,
+    ) -> (
+        Option<Nameserver>,
+        Option<Box<dyn Future<Item = (), Error = ()> + Send>>,
+    ) {
         let key = &EntryKey::from_name(zone);
         let (nameserver, missing_nameserver) = self
             .zones
             .lock()
             .unwrap()
             .get_nameserver(key, &mut self.nameservers.lock().unwrap());
-        self.probe_nameservers(missing_nameserver, resolver);
-        nameserver
+        (
+            nameserver,
+            self.probe_nameservers(missing_nameserver, resolver),
+        )
     }
 
     pub fn fetch_zone(
@@ -74,11 +83,15 @@ impl NSAddressStore {
         );
     }
 
-    fn probe_nameservers(&self, missing_nameserver: Vec<Name>, resolver: &Recursor) {
+    fn probe_nameservers(
+        &self,
+        missing_nameserver: Vec<Name>,
+        resolver: &Recursor,
+    ) -> Option<Box<dyn Future<Item = (), Error = ()> + Send>> {
         if missing_nameserver.is_empty()
             || self.probing_name_servers.lock().unwrap().len() >= MAX_PROBING_NAMESERVER_COUNT
         {
-            return;
+            return None;
         }
 
         let missing_nameserver = {
@@ -93,28 +106,31 @@ impl NSAddressStore {
                     servers
                 })
         };
-        if !missing_nameserver.is_empty() {
-            println!(
-                "start to probe {:?}, waiting queue len is {}",
-                missing_nameserver,
-                self.probing_name_servers.lock().unwrap().len()
-            );
-            let probing_name_servers = self.probing_name_servers.clone();
-            let done_nameserver = missing_nameserver.clone();
-            spawn(Box::new(
-                NameserverFetcher::new(
-                    missing_nameserver,
-                    self.nameservers.clone(),
-                    resolver.clone(),
-                )
-                .map(move |_| {
-                    let mut probing_name_servers = probing_name_servers.lock().unwrap();
-                    done_nameserver.into_iter().for_each(|n| {
-                        probing_name_servers.remove(&n);
-                    });
-                }),
-            ));
+
+        if missing_nameserver.is_empty() {
+            return None;
         }
+
+        println!(
+            "start to probe {:?}, waiting queue len is {}",
+            missing_nameserver,
+            self.probing_name_servers.lock().unwrap().len()
+        );
+        let probing_name_servers = self.probing_name_servers.clone();
+        let done_nameserver = missing_nameserver.clone();
+        return Some(Box::new(
+            NameserverFetcher::new(
+                missing_nameserver,
+                self.nameservers.clone(),
+                resolver.clone(),
+            )
+            .map(move |_| {
+                let mut probing_name_servers = probing_name_servers.lock().unwrap();
+                done_nameserver.into_iter().for_each(|n| {
+                    probing_name_servers.remove(&n);
+                });
+            }),
+        ));
     }
 }
 

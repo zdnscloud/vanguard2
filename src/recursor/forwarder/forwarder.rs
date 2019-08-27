@@ -1,4 +1,4 @@
-use crate::network::Nameserver;
+use crate::recursor::util::Nameserver;
 use std::{
     cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd},
     net::SocketAddr,
@@ -39,11 +39,9 @@ impl Nameserver for Forwarder {
             self.rtt = ((self.rtt * 3) + (new * 7)) / 10;
         }
     }
-}
 
-impl Forwarder {
     #[inline]
-    pub fn get_rtt(&self) -> Duration {
+    fn get_rtt(&self) -> Duration {
         Duration::from_nanos(self.rtt)
     }
 }
